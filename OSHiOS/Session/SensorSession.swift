@@ -1,207 +1,270 @@
 import Foundation
 import Combine
 
+// MARK: - SessionError
+
+enum SessionError: Error, LocalizedError {
+    case unexpectedExit
+
+    var errorDescription: String? { "The session ended unexpectedly" }
+}
+
 // MARK: - SensorSession
 //
-// Owns the full lifecycle for one "run":
-//   1. Build sensor modules from config
-//   2. Register system with OSH node (POST /api/systems)
-//   3. Register one datastream per module (POST /api/systems/{id}/datastreams)
-//   4. Subscribe each module's Combine publisher → ObservationPublisher → POST observations
+// Owns the full lifecycle for one streaming run.
+//
+// State machine:
+//   idle       → connecting    (start() called)
+//   connecting → streaming     (all registration steps succeeded)
+//   connecting → failed(Error) (any step threw, or task cancelled by non-user path)
+//   streaming  → idle          (stop() called)
+//   failed     → connecting    (start() called again — Retry)
+//   failed     → idle          (dismissError() called)
+//
+// CRITICAL: every exit from .connecting MUST transition to .streaming or .failed.
+// The defer block in run() is the safety net that enforces this.
 
 @MainActor
 final class SensorSession: ObservableObject {
 
-    enum State: Equatable {
+    // MARK: - State
+
+    enum State {
         case idle
-        case registering(String)   // message describing current step
+        case connecting(String)  // step description shown in UI
         case streaming
-        case error(String)
+        case failed(Error)       // startup failed; Retry or Dismiss
     }
 
     @Published private(set) var state: State = .idle
     @Published private(set) var sensorStatus: [String: String] = [:]
+    /// False while streaming if the network path is unavailable (observations are buffering).
+    @Published private(set) var isNetworkConnected = true
+
+    // MARK: - Private
 
     private var modules: [SensorModule] = []
     private var orientCoord: OrientationOutputCoordinator?
     private var client: ConnectedSystemsClient?
     private var publisher: ObservationPublisher?
     private var cancellables = Set<AnyCancellable>()
+    private var runTask: Task<Void, Never>?
 
-    // MARK: - Start
+    // MARK: - Public API
 
+    /// Begin a new session. Allowed from .idle or .failed (retry path).
     func start(config: AppConfig, server: ServerConfig, systemName: String) {
-        guard state == .idle else { return }
-        Task { await run(config: config, server: server, systemName: systemName) }
+        switch state {
+        case .idle, .failed: break
+        default: return  // already connecting or streaming
+        }
+        sensorStatus = [:]
+        runTask = Task { await run(config: config, server: server, systemName: systemName) }
     }
 
+    /// Stop an active streaming session and return to .idle.
     func stop() {
-        cancellables.removeAll()
-        publisher?.stopAll()
-        for m in modules { m.stop() }
-        orientCoord?.stop()
-        modules = []
-        orientCoord = nil
-        client = nil
-        publisher = nil
+        runTask?.cancel()
+        runTask = nil
+        cleanupModules()
         sensorStatus = [:]
+        isNetworkConnected = true
         state = .idle
     }
 
-    // MARK: - Internal
+    /// Cancel a startup that is currently .connecting and return to .idle.
+    func cancelStartup() {
+        guard case .connecting = state else { return }
+        stop()
+    }
+
+    /// Dismiss the .failed state and return to .idle without retrying.
+    func dismissError() {
+        guard case .failed = state else { return }
+        state = .idle
+    }
+
+    /// Whether the session is active (connecting or streaming) — use to disable UI controls.
+    var isActive: Bool {
+        switch state {
+        case .connecting, .streaming: return true
+        default: return false
+        }
+    }
+
+    // MARK: - Run loop
 
     private func run(config: AppConfig, server: ServerConfig, systemName: String) async {
-        // ── Step 1: Build sensor modules ──────────────────────────────────────
-        setState(.registering("Building sensor modules…"))
-        let descriptor = SystemDescriptor(systemName: systemName)
-
-        var builtModules: [SensorModule] = []
-
-        if config.enableGPS {
-            let gps = GPSOutput(localFrameURI: descriptor.localFrameURI)
-            builtModules.append(gps)
+        // Safety net: if we exit this function while still .connecting for any reason
+        // (unhandled throw, programming error), transition to .failed so the UI never sticks.
+        var succeeded = false
+        defer {
+            if !succeeded {
+                cleanupModules()
+                // Only set .failed if we weren't cancelled — stop() already set .idle.
+                if !Task.isCancelled, case .connecting = state {
+                    state = .failed(SessionError.unexpectedExit)
+                }
+            }
         }
 
-        let coord = OrientationOutputCoordinator(localFrameURI: descriptor.localFrameURI)
-        if config.enableOrientationQuat  { builtModules.append(coord.quatOutput) }
-        if config.enableOrientationEuler { builtModules.append(coord.eulerOutput) }
-        let needsOrientation = config.enableOrientationQuat || config.enableOrientationEuler
-        if needsOrientation { self.orientCoord = coord }
-
-        if config.enableBarometer  { builtModules.append(BarometerOutput()) }
-        if config.enableAudioLevel { builtModules.append(AudioLevelOutput()) }
-        if config.enableVideoH264  { builtModules.append(VideoOutputH264(config: config.videoConfig)) }
-
-        self.modules = builtModules
-
-        // ── Step 2: Connect to OSH node ───────────────────────────────────────
-        setState(.registering("Connecting to \(server.url)…"))
-        let client: ConnectedSystemsClient
         do {
-            client = try ConnectedSystemsClient(
+            // ── Step 1: Build sensor modules ─────────────────────────────────
+            try advance(to: "Building sensor modules…")
+            let descriptor = SystemDescriptor(systemName: systemName)
+
+            var builtModules: [SensorModule] = []
+
+            if config.enableGPS {
+                builtModules.append(GPSOutput(localFrameURI: descriptor.localFrameURI))
+            }
+
+            let coord = OrientationOutputCoordinator(localFrameURI: descriptor.localFrameURI)
+            if config.enableOrientationQuat  { builtModules.append(coord.quatOutput) }
+            if config.enableOrientationEuler { builtModules.append(coord.eulerOutput) }
+            let needsOrientation = config.enableOrientationQuat || config.enableOrientationEuler
+            if needsOrientation { self.orientCoord = coord }
+
+            if config.enableBarometer  { builtModules.append(BarometerOutput()) }
+            if config.enableAudioLevel { builtModules.append(AudioLevelOutput()) }
+            if config.enableVideoH264  { builtModules.append(VideoOutputH264(config: config.videoConfig)) }
+
+            self.modules = builtModules
+
+            // ── Step 2: Create client ─────────────────────────────────────────
+            try advance(to: "Connecting to \(server.url)…")
+            let client = try ConnectedSystemsClient(
                 nodeURL: server.url,
                 username: server.username,
                 password: server.password
             )
-        } catch {
-            setState(.error("Invalid server URL: \(error.localizedDescription)"))
-            return
-        }
-        self.client = client
+            self.client = client
 
-        // ── Step 3: Register system ───────────────────────────────────────────
-        setState(.registering("Registering system…"))
-        let systemId: String
-        do {
-            systemId = try await SystemRegistration.registerIfNeeded(
+            // ── Step 3: Register system ───────────────────────────────────────
+            try advance(to: "Registering system…")
+            let systemId = try await SystemRegistration.registerIfNeeded(
                 client: client,
                 descriptor: descriptor
             )
-        } catch {
-            setState(.error("System registration failed: \(error.localizedDescription)"))
-            return
-        }
 
-        // ── Step 4: Configure hardware (resolves actual sensor dimensions) ──────
-        // VideoOutput.configure() runs configureSession() and reads the real
-        // camera output dimensions after portrait rotation — must happen before
-        // datastream registration so the schema has the correct width/height.
-        setState(.registering("Configuring sensors…"))
-        var configuredModules = builtModules
-        for module in builtModules {
-            do {
-                try module.configure()
-            } catch SensorError.unavailable(let msg) {
-                sensorStatus[module.outputName] = "Unavailable: \(msg)"
-                configuredModules.removeAll { $0.outputName == module.outputName }
-            } catch {
-                setState(.error("Sensor configuration failed: \(error.localizedDescription)"))
-                return
+            // ── Step 4: Configure hardware ────────────────────────────────────
+            try advance(to: "Configuring sensors…")
+            var configuredModules = builtModules
+            for module in builtModules {
+                do {
+                    try module.configure()
+                } catch SensorError.unavailable(let msg) {
+                    sensorStatus[module.outputName] = "Unavailable: \(msg)"
+                    configuredModules.removeAll { $0.outputName == module.outputName }
+                }
+                // Non-unavailable errors propagate to the outer catch → .failed
             }
-        }
-        builtModules = configuredModules
+            builtModules = configuredModules
 
-        // ── Step 5: Register datastreams ──────────────────────────────────────
-        setState(.registering("Registering datastreams…"))
-        var datastreamIds: [String: String] = [:]
-        for module in builtModules {
-            do {
+            // ── Step 5: Register datastreams ──────────────────────────────────
+            try advance(to: "Registering datastreams…")
+            var datastreamIds: [String: String] = [:]
+            for module in builtModules {
                 let dsId = try await DatastreamRegistration.registerIfNeeded(
                     client: client,
                     systemId: systemId,
                     module: module
                 )
                 datastreamIds[module.outputName] = dsId
-            } catch {
-                setState(.error("Datastream registration failed for \(module.outputName): \(error.localizedDescription)"))
-                return
             }
-        }
 
-        // ── Step 6: Wire ObservationPublisher ─────────────────────────────────
-        var datastreamSchemas: [String: DataRecord] = [:]
-        for module in builtModules {
-            datastreamSchemas[module.outputName] = module.recordDescription
-        }
+            // ── Step 6: Wire ObservationPublisher ─────────────────────────────
+            var datastreamSchemas: [String: DataRecord] = [:]
+            for module in builtModules {
+                datastreamSchemas[module.outputName] = module.recordDescription
+            }
 
-        let pub = ObservationPublisher()
-        pub.configure(client: client, systemId: systemId,
-                      datastreamIds: datastreamIds,
-                      datastreamSchemas: datastreamSchemas)
-        pub.subscribe(to: builtModules)
-        pub.startNetworkMonitoring()
-        self.publisher = pub
+            let pub = ObservationPublisher()
+            pub.configure(client: client, systemId: systemId,
+                          datastreamIds: datastreamIds,
+                          datastreamSchemas: datastreamSchemas)
+            pub.subscribe(to: builtModules)
+            pub.startNetworkMonitoring()
+            self.publisher = pub
 
-        // Mirror publisher's queue count into our own status
-        pub.$queuedCount
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] count in
-                if count > 0 {
-                    self?.sensorStatus["queue"] = "\(count) buffered"
-                } else {
-                    self?.sensorStatus.removeValue(forKey: "queue")
+            pub.$queuedCount
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] count in
+                    if count > 0 {
+                        self?.sensorStatus["queue"] = "\(count) buffered"
+                    } else {
+                        self?.sensorStatus.removeValue(forKey: "queue")
+                    }
                 }
+                .store(in: &cancellables)
+
+            pub.$isConnected
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] connected in self?.isNetworkConnected = connected }
+                .store(in: &cancellables)
+
+            // ── Step 7: Start sensors ─────────────────────────────────────────
+            try advance(to: "Starting sensors…")
+
+            if needsOrientation {
+                do {
+                    try coord.start()
+                } catch SensorError.unavailable(let msg) {
+                    sensorStatus["orientation"] = "Unavailable: \(msg)"
+                    builtModules.removeAll { $0 is QuatOrientationOutput || $0 is EulerOrientationOutput }
+                    self.orientCoord = nil
+                }
+                // Non-unavailable errors propagate to outer catch → .failed
             }
-            .store(in: &cancellables)
 
-        // ── Step 7: Start sensors ─────────────────────────────────────────────
-        setState(.registering("Starting sensors…"))
-
-        // Try to start orientation. If hardware is unavailable (e.g. simulator),
-        // remove orientation modules and continue — don't abort the whole session.
-        if needsOrientation {
-            do {
-                try coord.start()
-            } catch SensorError.unavailable(let msg) {
-                sensorStatus["orientation"] = "Unavailable: \(msg)"
-                builtModules.removeAll { $0 is QuatOrientationOutput || $0 is EulerOrientationOutput }
-                self.orientCoord = nil
-            } catch {
-                setState(.error("Sensor start failed: \(error.localizedDescription)"))
-                return
+            for module in builtModules {
+                guard !(module is QuatOrientationOutput),
+                      !(module is EulerOrientationOutput) else { continue }
+                do {
+                    try module.start()
+                } catch SensorError.unavailable(let msg) {
+                    sensorStatus[module.outputName] = "Unavailable: \(msg)"
+                    builtModules.removeAll { $0.outputName == module.outputName }
+                }
+                // Non-unavailable errors propagate to outer catch → .failed
             }
-        }
 
-        for module in builtModules {
-            guard !(module is QuatOrientationOutput),
-                  !(module is EulerOrientationOutput) else { continue }
-            do {
-                try module.start()
-            } catch SensorError.unavailable(let msg) {
-                sensorStatus[module.outputName] = "Unavailable: \(msg)"
-                builtModules.removeAll { $0.outputName == module.outputName }
-            } catch {
-                setState(.error("Sensor start failed: \(error.localizedDescription)"))
-                return
+            for module in builtModules {
+                subscribeStatus(for: module)
             }
-        }
 
-        // Subscribe status updates from each module
-        for module in builtModules {
-            subscribeStatus(for: module)
-        }
+            // ── Done ──────────────────────────────────────────────────────────
+            succeeded = true
+            state = .streaming
 
-        setState(.streaming)
+        } catch {
+            // Single exit point for all failures.
+            // If the task was cancelled, stop() already set state = .idle — leave it.
+            if !Task.isCancelled {
+                state = .failed(error)
+            }
+            // defer handles cleanupModules()
+        }
+    }
+
+    /// Checks for task cancellation, then advances the connecting status message.
+    /// Throws CancellationError if the task was cancelled, unwinding the run() do/catch.
+    private func advance(to message: String) throws {
+        try Task.checkCancellation()
+        state = .connecting(message)
+    }
+
+    // MARK: - Cleanup
+
+    private func cleanupModules() {
+        cancellables.removeAll()
+        publisher?.stopAll()
+        for m in modules { m.stop() }
+        orientCoord?.stop()
+        modules      = []
+        orientCoord  = nil
+        client       = nil
+        publisher    = nil
     }
 
     // MARK: - Live status subscriptions
@@ -241,9 +304,45 @@ final class SensorSession: ObservableObject {
             .store(in: &cancellables)
     }
 
-    // MARK: - Helpers
+    // MARK: - User-facing error messages
 
-    private func setState(_ s: State) {
-        state = s
+    static func userFacingMessage(for error: Error) -> (title: String, suggestion: String) {
+        if let clientErr = error as? ClientError {
+            switch clientErr {
+            case .invalidURL:
+                return ("Invalid server URL",
+                        "Check the URL in Settings — it should start with http:// or https://")
+            case .httpError(401):
+                return ("Authentication failed",
+                        "Check your username and password in Settings")
+            case .httpError(let code):
+                return ("Server error (\(code))",
+                        "The OSH node returned an unexpected response")
+            case .missingLocation:
+                return ("Registration failed",
+                        "The server accepted the request but returned no resource ID")
+            default:
+                break
+            }
+        }
+
+        if let urlErr = error as? URLError {
+            switch urlErr.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                return ("No internet connection",
+                        "Check your network connection and try again")
+            case .timedOut:
+                return ("Connection timed out",
+                        "The server took too long to respond — check the URL and try again")
+            case .cannotConnectToHost, .cannotFindHost:
+                return ("Cannot reach server",
+                        "Check the server URL and make sure the OSH node is running")
+            default:
+                break
+            }
+        }
+
+        return ("Connection failed",
+                "An unexpected error occurred — check Settings and try again")
     }
 }

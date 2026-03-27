@@ -20,12 +20,7 @@ struct ContentView: View {
                     NavigationLink(destination: SettingsView()) {
                         Image(systemName: "gear")
                     }
-                }
-                if isStreaming {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Stop", role: .destructive) { session.stop() }
-                            .tint(.red)
-                    }
+                    .disabled(session.isActive)
                 }
             }
         }
@@ -57,7 +52,7 @@ struct ContentView: View {
                 }
             }
         }
-        .disabled(isStreaming)
+        .disabled(session.isActive)
     }
 
     private var sensorsSection: some View {
@@ -76,13 +71,21 @@ struct ContentView: View {
                 }
             }
         }
-        .disabled(isStreaming)
+        .disabled(session.isActive)
     }
 
     private var statusSection: some View {
         Section("Status") {
             LabeledContent("Session", value: stateLabel)
                 .foregroundStyle(stateColor)
+
+            // Mid-session network loss indicator — observations are buffering locally.
+            // ObservationPublisher's ring buffer will drain once connectivity returns.
+            if case .streaming = session.state, !session.isNetworkConnected {
+                LabeledContent("Network", value: "Unavailable — buffering")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
 
             if !session.sensorStatus.isEmpty {
                 ForEach(session.sensorStatus.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
@@ -97,10 +100,10 @@ struct ContentView: View {
 
     private var actionSection: some View {
         Section {
-            Button(isStreaming ? "Stop" : "Start") {
-                if isStreaming {
-                    session.stop()
-                } else {
+            switch session.state {
+
+            case .idle:
+                Button("Start Streaming") {
                     config.save()
                     if let server = settings.activeServer {
                         session.start(config: config,
@@ -108,54 +111,93 @@ struct ContentView: View {
                                       systemName: settings.systemName)
                     }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .foregroundStyle(startButtonColor)
-            .disabled(!isStreaming && settings.activeServer == nil)
+                .frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent)
+                .disabled(settings.activeServer == nil)
 
-            if case .error(let msg) = session.state {
-                Text(msg)
-                    .font(.footnote)
+            case .connecting(let step):
+                VStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text(step).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    Button("Cancel") { session.cancelStartup() }
+                        .frame(maxWidth: .infinity)
+                        .foregroundStyle(.red)
+                }
+                .padding(.vertical, 4)
+
+            case .streaming:
+                Button("Stop Streaming") { session.stop() }
+                    .frame(maxWidth: .infinity)
                     .foregroundStyle(.red)
+
+            case .failed(let error):
+                let msg = SensorSession.userFacingMessage(for: error)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(msg.title)
+                                .foregroundStyle(.red)
+                                .font(.footnote.weight(.semibold))
+                            Text(msg.suggestion)
+                                .foregroundStyle(.secondary)
+                                .font(.footnote)
+                        }
+                    }
+                    HStack(spacing: 16) {
+                        Button("Retry") {
+                            config.save()
+                            if let server = settings.activeServer {
+                                session.start(config: config,
+                                              server: server,
+                                              systemName: settings.systemName)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(settings.activeServer == nil)
+
+                        Button("Dismiss") { session.dismissError() }
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
+            // Debug helper — only shown after a failed startup
+            if case .failed = session.state {
                 Button("Reset cached registration") {
                     SystemRegistration.clearCachedId()
                     DatastreamRegistration.clearCachedIds()
                 }
                 .font(.footnote)
+                .foregroundStyle(.secondary)
             }
         }
     }
 
     // MARK: - Helpers
 
-    private var isStreaming: Bool {
-        switch session.state {
-        case .registering, .streaming: return true
-        default: return false
-        }
-    }
-
     private var stateLabel: String {
         switch session.state {
-        case .idle:                return "Idle"
-        case .registering(let m):  return m
-        case .streaming:           return "Streaming"
-        case .error:               return "Error"
+        case .idle:               return "Idle"
+        case .connecting(let m):  return m
+        case .streaming:          return "Streaming"
+        case .failed:             return "Failed"
         }
     }
 
     private var stateColor: Color {
         switch session.state {
         case .idle:        return .secondary
-        case .registering: return .orange
+        case .connecting:  return .orange
         case .streaming:   return .green
-        case .error:       return .red
+        case .failed:      return .red
         }
-    }
-
-    private var startButtonColor: Color {
-        if isStreaming { return .red }
-        return settings.activeServer == nil ? .secondary : .green
     }
 }
 

@@ -18,8 +18,6 @@ import UIKit
 // in every object.  Swift Dictionary does not guarantee ordering, so we build the JSON
 // string directly instead of using JSONSerialization.
 //
-// iOS UID scheme mirrors Android:
-//   Android: "urn:osh:android:{ANDROID_ID}"
 //   iOS:     "urn:osh:ios:{UIDevice.identifierForVendor}"
 
 struct SystemDescriptor {
@@ -31,20 +29,20 @@ struct SystemDescriptor {
     let description: String
     let localFrameURI: String
 
-    init(config: AppConfig) {
+    /// - Parameters:
+    ///   - systemName: Human-readable display name shown on the OSH node
+    ///                 (from AppSettingsStore.systemName).
+    init(systemName: String) {
         let deviceUUID = UIDevice.current.identifierForVendor?.uuidString.lowercased()
             ?? UUID().uuidString.lowercased()
 
-        var uid = "\(Self.uidPrefix):\(deviceUUID)"
-        if !config.uidExtension.isEmpty {
-            uid += ":\(config.uidExtension)"
-        }
+        let uid = "\(Self.uidPrefix):\(deviceUUID)"
 
-        self.uniqueID     = uid
-        self.xmlID        = "IOS_SENSORS_\(deviceUUID.replacingOccurrences(of: "-", with: "_").uppercased())"
+        self.uniqueID      = uid
+        self.xmlID         = "IOS_SENSORS_\(deviceUUID.replacingOccurrences(of: "-", with: "_").uppercased())"
         self.localFrameURI = uid + "#LOCAL_FRAME"
-        self.name         = config.deviceName.isEmpty ? UIDevice.current.model : config.deviceName
-        self.description  = config.runDescription
+        self.name          = systemName
+        self.description   = ""
     }
 
     // MARK: - JSON serialisation

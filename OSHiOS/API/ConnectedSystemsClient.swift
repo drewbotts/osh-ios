@@ -415,6 +415,31 @@ actor ConnectedSystemsClient {
         return body
     }
 
+    // MARK: - Connectivity test
+
+    /// Tests server reachability and credentials by issuing GET /systems.
+    ///
+    /// - Returns:
+    ///   - `.connected`           — server responded (2xx, 404, or any non-401 HTTP status)
+    ///   - `.authenticationFailed` — server returned 401
+    ///   - `.unreachable`          — network error or non-HTTP response
+    func testConnectivity() async -> ConnectivityResult {
+        let url = baseURL.appendingPathComponent("systems")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        do {
+            let (_, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                return .unreachable("Non-HTTP response")
+            }
+            if http.statusCode == 401 { return .authenticationFailed }
+            return .connected
+        } catch {
+            return .unreachable(error.localizedDescription)
+        }
+    }
+
     // MARK: - Existence checks
 
     /// Returns true if GET /systems/{id} responds 2xx, false if 404.
@@ -502,6 +527,14 @@ private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
     ) {
         completionHandler(nil) // Don't follow; return the original response to the caller.
     }
+}
+
+// MARK: - Connectivity result
+
+enum ConnectivityResult: Equatable {
+    case connected
+    case authenticationFailed
+    case unreachable(String)
 }
 
 // MARK: - Errors

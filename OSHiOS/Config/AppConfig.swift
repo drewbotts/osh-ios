@@ -2,27 +2,23 @@ import Foundation
 
 // MARK: - AppConfig
 //
-// Central configuration persisted to UserDefaults.
-// Matches AndroidSensorsConfig fields.
+// Sensor-only configuration persisted to UserDefaults.
+// Server connection settings (URL, credentials) are managed separately
+// in AppSettingsStore / KeychainServerStore.
+//
+// Previous hardcoded defaults for reference (enter via Settings when testing):
+//   URL:      http://localhost:8181/sensorhub/api
+//   Username: admin
+//   Password: admin
 
 struct AppConfig: Codable {
-    // OSH node connection
-    var nodeURL: String      = "http://localhost:8181/sensorhub/api"
-    var username: String     = "admin"
-    var password: String     = "admin"
-
-    // Device identity (mirrors uidExtension / deviceName / runDescription in AndroidSensorsConfig)
-    var uidExtension: String  = ""
-    var deviceName: String    = ""
-    var runDescription: String = ""
-
-    // Sensor enables (mirrors AndroidSensorsConfig booleans)
-    var enableGPS: Bool            = true
+    // Sensor enables
+    var enableGPS: Bool             = true
     var enableOrientationQuat: Bool = true
     var enableOrientationEuler: Bool = true
-    var enableBarometer: Bool      = true
-    var enableAudioLevel: Bool     = true
-    var enableVideoH264: Bool      = false
+    var enableBarometer: Bool       = true
+    var enableAudioLevel: Bool      = true
+    var enableVideoH264: Bool       = false
 
     // Video settings
     // iPhone AVFoundation actual output dimensions (landscape, no rotation applied):

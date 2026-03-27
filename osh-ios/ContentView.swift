@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
     @State private var config = AppConfig.load()
     @StateObject private var session = SensorSession()
 
@@ -15,6 +16,11 @@ struct ContentView: View {
             .navigationTitle("OSH Sensor Hub")
             .onDisappear { session.stop() }
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    NavigationLink(destination: SettingsView()) {
+                        Image(systemName: "gear")
+                    }
+                }
                 if isStreaming {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("Stop", role: .destructive) { session.stop() }
@@ -29,14 +35,27 @@ struct ContentView: View {
 
     private var serverSection: some View {
         Section("Server") {
-            TextField("OSH Node URL", text: $config.nodeURL)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-            TextField("Username", text: $config.username)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-            SecureField("Password", text: $config.password)
+            if settings.serverConfigs.isEmpty {
+                Text("No server configured — go to Settings to add one.")
+                    .foregroundStyle(.secondary)
+                    .font(.footnote)
+            } else {
+                Picker("Server", selection: $settings.activeServerId) {
+                    Text("None selected").tag(nil as UUID?)
+                    ForEach(settings.serverConfigs) { server in
+                        Text(server.label).tag(server.id as UUID?)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                if let server = settings.activeServer {
+                    Text(server.url)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
         }
         .disabled(isStreaming)
     }
@@ -83,11 +102,16 @@ struct ContentView: View {
                     session.stop()
                 } else {
                     config.save()
-                    session.start(config: config)
+                    if let server = settings.activeServer {
+                        session.start(config: config,
+                                      server: server,
+                                      systemName: settings.systemName)
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
-            .foregroundStyle(isStreaming ? .red : .green)
+            .foregroundStyle(startButtonColor)
+            .disabled(!isStreaming && settings.activeServer == nil)
 
             if case .error(let msg) = session.state {
                 Text(msg)
@@ -116,7 +140,7 @@ struct ContentView: View {
         case .idle:                return "Idle"
         case .registering(let m):  return m
         case .streaming:           return "Streaming"
-        case .error(let e):        return "Error"
+        case .error:               return "Error"
         }
     }
 
@@ -128,8 +152,14 @@ struct ContentView: View {
         case .error:       return .red
         }
     }
+
+    private var startButtonColor: Color {
+        if isStreaming { return .red }
+        return settings.activeServer == nil ? .secondary : .green
+    }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(AppSettingsStore())
 }

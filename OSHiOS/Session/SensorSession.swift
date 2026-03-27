@@ -30,9 +30,9 @@ final class SensorSession: ObservableObject {
 
     // MARK: - Start
 
-    func start(config: AppConfig) {
+    func start(config: AppConfig, server: ServerConfig, systemName: String) {
         guard state == .idle else { return }
-        Task { await run(config: config) }
+        Task { await run(config: config, server: server, systemName: systemName) }
     }
 
     func stop() {
@@ -50,10 +50,10 @@ final class SensorSession: ObservableObject {
 
     // MARK: - Internal
 
-    private func run(config: AppConfig) async {
+    private func run(config: AppConfig, server: ServerConfig, systemName: String) async {
         // ── Step 1: Build sensor modules ──────────────────────────────────────
         setState(.registering("Building sensor modules…"))
-        let descriptor = SystemDescriptor(config: config)
+        let descriptor = SystemDescriptor(systemName: systemName)
 
         var builtModules: [SensorModule] = []
 
@@ -75,13 +75,13 @@ final class SensorSession: ObservableObject {
         self.modules = builtModules
 
         // ── Step 2: Connect to OSH node ───────────────────────────────────────
-        setState(.registering("Connecting to \(config.nodeURL)…"))
+        setState(.registering("Connecting to \(server.url)…"))
         let client: ConnectedSystemsClient
         do {
             client = try ConnectedSystemsClient(
-                nodeURL: config.nodeURL,
-                username: config.username,
-                password: config.password
+                nodeURL: server.url,
+                username: server.username,
+                password: server.password
             )
         } catch {
             setState(.error("Invalid server URL: \(error.localizedDescription)"))

@@ -49,21 +49,33 @@ final class SensorSession: ObservableObject {
     private var publisher: ObservationPublisher?
     private var cancellables = Set<AnyCancellable>()
     private var runTask: Task<Void, Never>?
+    /// Tracks the best-effort Garmin registration task so stop() can cancel it.
+    private var garminTask: Task<Void, Never>?
 
     // MARK: - Public API
 
     /// Begin a new session. Allowed from .idle or .failed (retry path).
-    func start(config: AppConfig, server: ServerConfig, systemName: String) {
+    func start(config: AppConfig,
+               server: ServerConfig,
+               systemName: String,
+               garminSettings: GarminSettingsStore? = nil) {
         switch state {
         case .idle, .failed: break
         default: return  // already connecting or streaming
         }
         sensorStatus = [:]
-        runTask = Task { await run(config: config, server: server, systemName: systemName) }
+        runTask = Task {
+            await run(config: config,
+                      server: server,
+                      systemName: systemName,
+                      garminSettings: garminSettings)
+        }
     }
 
     /// Stop an active streaming session and return to .idle.
     func stop() {
+        garminTask?.cancel()
+        garminTask = nil
         runTask?.cancel()
         runTask = nil
         cleanupModules()
@@ -94,7 +106,10 @@ final class SensorSession: ObservableObject {
 
     // MARK: - Run loop
 
-    private func run(config: AppConfig, server: ServerConfig, systemName: String) async {
+    private func run(config: AppConfig,
+                     server: ServerConfig,
+                     systemName: String,
+                     garminSettings: GarminSettingsStore? = nil) async {
         // Safety net: if we exit this function while still .connecting for any reason
         // (unhandled throw, programming error), transition to .failed so the UI never sticks.
         var succeeded = false
@@ -237,6 +252,27 @@ final class SensorSession: ObservableObject {
             succeeded = true
             state = .streaming
 
+            // ── Optional: Garmin real-time streaming ──────────────────────────
+            // Best-effort — failures are logged but do not abort the main session.
+            // Stored in garminTask so stop() can cancel it if the session ends
+            // before Garmin registration completes.
+            if let garminSettings,
+               garminSettings.settings.streamingMode == .realTime,
+               case .connected(let deviceName) = GarminManager.shared.deviceState,
+               let unitID = GarminManager.shared.connectedUnitID {
+                garminTask = Task { @MainActor [weak self] in
+                    await self?.startGarminStreaming(
+                        client: client,
+                        systemId: systemId,
+                        publisher: pub,
+                        garminSettings: garminSettings,
+                        deviceName: deviceName,
+                        unitID: unitID,
+                        localFrameURI: descriptor.localFrameURI
+                    )
+                }
+            }
+
         } catch {
             // Single exit point for all failures.
             // If the task was cancelled, stop() already set state = .idle — leave it.
@@ -254,17 +290,129 @@ final class SensorSession: ObservableObject {
         state = .connecting(message)
     }
 
+    // MARK: - Garmin streaming
+
+    private var garminOutputs: [SensorModule] = []
+
+    /// Registers the Garmin wearable as a child system, registers its datastreams,
+    /// subscribes outputs to the shared ObservationPublisher, and starts real-time streaming.
+    /// All errors are caught and logged — Garmin failure never stops the main session.
+    private func startGarminStreaming(
+        client: ConnectedSystemsClient,
+        systemId: String,
+        publisher: ObservationPublisher,
+        garminSettings: GarminSettingsStore,
+        deviceName: String,
+        unitID: UInt32,
+        localFrameURI: String
+    ) async {
+        // Bail out immediately if the session was stopped before we even started.
+        guard !Task.isCancelled else { return }
+
+        do {
+            let descriptor = GarminSystemDescriptor(unitID: unitID, deviceName: deviceName)
+
+            // Register the Garmin device as a subsystem of the phone system
+            let garminSystemId = try await client.registerSubsystem(
+                parentSystemId: systemId,
+                descriptor: descriptor
+            )
+
+            // If stop() was called while we awaited registration, abort cleanly.
+            try Task.checkCancellation()
+
+            // Build outputs according to enabled data types
+            var outputs: [SensorModule] = []
+            let mgr = GarminManager.shared
+            if garminSettings.settings.enableHeartRate {
+                outputs.append(GarminHeartRateOutput(source: mgr.heartRatePublisher))
+            }
+            if garminSettings.settings.enableStress {
+                outputs.append(GarminStressOutput(source: mgr.stressPublisher))
+            }
+            if garminSettings.settings.enableRespiration {
+                outputs.append(GarminRespirationOutput(source: mgr.respirationPublisher))
+            }
+            if garminSettings.settings.enableAccelerometer {
+                outputs.append(GarminAccelerometerOutput(
+                    source: mgr.accelerometerPublisher,
+                    localFrameURI: descriptor.localFrameURI
+                ))
+            }
+
+            // Register datastreams for each output.
+            // All registrations must succeed before we wire anything — this prevents
+            // partial state where only some datastreams are routed in the publisher.
+            var garminIds: [String: String] = [:]
+            var garminSchemas: [String: DataRecord] = [:]
+            for output in outputs {
+                try Task.checkCancellation()
+                let dsId = try await DatastreamRegistration.registerIfNeeded(
+                    client: client,
+                    systemId: garminSystemId,
+                    module: output
+                )
+                garminIds[output.outputName]     = dsId
+                garminSchemas[output.outputName] = output.recordDescription
+            }
+
+            try Task.checkCancellation()
+
+            // All registrations succeeded — wire into the shared publisher.
+            publisher.addDatastreams(ids: garminIds, schemas: garminSchemas)
+            publisher.subscribeGarmin(to: outputs)
+
+            // Start each output (subscribes to GarminManager publishers).
+            // Track started outputs so the catch block can stop them on failure.
+            var startedOutputs: [SensorModule] = []
+            for output in outputs {
+                try output.start()
+                startedOutputs.append(output)
+            }
+            self.garminOutputs = startedOutputs
+
+            // Kick off real-time streaming on the device
+            GarminManager.shared.startRealTimeStreaming()
+
+            sensorStatus["garmin"] = deviceName
+
+        } catch is CancellationError {
+            // Session was stopped — stop the device stream and clean up started outputs.
+            GarminManager.shared.stopRealTimeStreaming()
+            for m in garminOutputs { m.stop() }
+            garminOutputs = []
+            sensorStatus.removeValue(forKey: "garmin")
+            // Server-side registrations (subsystem + datastreams) are left in place;
+            // they will be reused on the next session start via registerIfNeeded caching.
+
+        } catch {
+            // Stop any outputs started before the failure.
+            for m in garminOutputs { m.stop() }
+            garminOutputs = []
+            // Note: if registerSubsystem succeeded before this throw, the subsystem
+            // and any partially-registered datastreams remain on the server.
+            // They will be reused on retry once GarminSystemRegistration caching is added (H2).
+            print("[SensorSession] Garmin integration failed: \(error.localizedDescription)")
+            sensorStatus["garmin"] = "Unavailable: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Cleanup
 
     private func cleanupModules() {
+        garminTask?.cancel()
+        garminTask = nil
+        GarminManager.shared.stopRealTimeStreaming()
         cancellables.removeAll()
         publisher?.stopAll()
         for m in modules { m.stop() }
+        for m in garminOutputs { m.stop() }
         orientCoord?.stop()
-        modules      = []
-        orientCoord  = nil
-        client       = nil
-        publisher    = nil
+        modules       = []
+        garminOutputs = []
+        orientCoord   = nil
+        client        = nil
+        publisher     = nil
     }
 
     // MARK: - Live status subscriptions

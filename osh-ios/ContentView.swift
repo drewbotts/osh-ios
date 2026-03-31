@@ -2,10 +2,43 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var nav: AppNavigationState
+    @EnvironmentObject private var garminSettings: GarminSettingsStore
+    @EnvironmentObject private var garmin: GarminManager
     @State private var config = AppConfig.load()
     @StateObject private var session = SensorSession()
 
     var body: some View {
+        ZStack(alignment: .leading) {
+            tabContent
+            SidebarView()
+        }
+        .onDisappear { session.stop() }
+    }
+
+    // MARK: - Tab routing
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch nav.selectedTab {
+        case .main:
+            mainView
+        case .garmin:
+            NavigationStack {
+                GarminView()
+                    .toolbar { hamburgerItem }
+            }
+        case .settings:
+            NavigationStack {
+                SettingsView()
+                    .toolbar { hamburgerItem }
+            }
+        }
+    }
+
+    // MARK: - Main (sensor hub) view
+
+    private var mainView: some View {
         NavigationStack {
             Form {
                 serverSection
@@ -14,14 +47,19 @@ struct ContentView: View {
                 actionSection
             }
             .navigationTitle("OSH Sensor Hub")
-            .onDisappear { session.stop() }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    NavigationLink(destination: SettingsView()) {
-                        Image(systemName: "gear")
-                    }
-                    .disabled(session.isActive)
+            .toolbar { hamburgerItem }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var hamburgerItem: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    nav.toggleSidebar()
                 }
+            } label: {
+                Image(systemName: "line.3.horizontal")
             }
         }
     }
@@ -87,6 +125,13 @@ struct ContentView: View {
                     .foregroundStyle(.orange)
             }
 
+            // Garmin status row — shown when SDK is active (not .sdkUnavailable)
+            if garmin.deviceState != .sdkUnavailable {
+                LabeledContent("Garmin", value: garminStatusLabel)
+                    .font(.footnote)
+                    .foregroundStyle(garminStatusColor)
+            }
+
             if !session.sensorStatus.isEmpty {
                 ForEach(session.sensorStatus.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
                     let unavailable = value.hasPrefix("Unavailable:")
@@ -95,6 +140,29 @@ struct ContentView: View {
                         .foregroundStyle(unavailable ? Color.red.opacity(0.7) : .secondary)
                 }
             }
+        }
+    }
+
+    private var garminStatusLabel: String {
+        switch garmin.deviceState {
+        case .sdkUnavailable:      return "Unavailable"
+        case .notInitialized:      return "Not initialized"
+        case .initializing:        return "Initializing…"
+        case .ready:               return "Ready — no device"
+        case .scanning:            return "Scanning…"
+        case .connecting(let d):   return "Connecting to \(d)…"
+        case .connected(let d):    return d
+        case .syncing(let d):      return "Syncing \(d)…"
+        case .error(let m):        return "Error: \(m)"
+        }
+    }
+
+    private var garminStatusColor: Color {
+        switch garmin.deviceState {
+        case .sdkUnavailable, .notInitialized, .ready: return .secondary
+        case .initializing, .scanning, .connecting, .syncing: return .orange
+        case .connected: return .green
+        case .error: return .red
         }
     }
 
@@ -108,7 +176,8 @@ struct ContentView: View {
                     if let server = settings.activeServer {
                         session.start(config: config,
                                       server: server,
-                                      systemName: settings.systemName)
+                                      systemName: settings.systemName,
+                                      garminSettings: garminSettings)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -155,7 +224,8 @@ struct ContentView: View {
                             if let server = settings.activeServer {
                                 session.start(config: config,
                                               server: server,
-                                              systemName: settings.systemName)
+                                              systemName: settings.systemName,
+                                              garminSettings: garminSettings)
                             }
                         }
                         .buttonStyle(.borderedProminent)
@@ -204,4 +274,7 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environmentObject(AppSettingsStore())
+        .environmentObject(AppNavigationState())
+        .environmentObject(GarminSettingsStore())
+        .environmentObject(GarminManager.shared)
 }

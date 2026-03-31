@@ -55,6 +55,19 @@ final class ObservationPublisher: ObservableObject {
         }
     }
 
+    /// Merges additional datastream ids and schemas into the publisher's routing tables.
+    /// Used to add Garmin (or other late-registered) outputs after initial configure().
+    func addDatastreams(ids: [String: String], schemas: [String: DataRecord]) {
+        datastreamIds.merge(ids) { _, new in new }
+        datastreamSchemas.merge(schemas) { _, new in new }
+    }
+
+    /// Subscribe to Garmin sensor outputs. Delegates to subscribe(to:) so all
+    /// Garmin observations share the same ring buffer and drain logic.
+    func subscribeGarmin(to outputs: [SensorModule]) {
+        subscribe(to: outputs)
+    }
+
     func startNetworkMonitoring() {
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let connected = path.status == .satisfied

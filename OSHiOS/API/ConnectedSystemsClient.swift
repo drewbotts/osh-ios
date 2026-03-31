@@ -61,6 +61,27 @@ actor ConnectedSystemsClient {
         return id
     }
 
+    // MARK: - Subsystem registration
+    //
+    // POST /systems/{parentSystemId}/subsystems  with SensorML-JSON body
+    // Registers a Garmin wearable as a child of the phone system.
+    // Returns the new subsystem resource id.
+
+    func registerSubsystem(parentSystemId: String,
+                           descriptor: GarminSystemDescriptor) async throws -> String {
+        let url = baseURL
+            .appendingPathComponent("systems")
+            .appendingPathComponent(parentSystemId)
+            .appendingPathComponent("subsystems")
+        let body = try descriptor.toJSONData()
+        let response = try await post(url: url, body: body, contentType: "application/sml+json")
+        guard let id = response.locationId else {
+            throw ClientError.missingLocation(
+                "POST /systems/\(parentSystemId)/subsystems returned no Location header")
+        }
+        return id
+    }
+
     // MARK: - Datastream registration
     //
     // POST /systems/{systemId}/datastreams  with SWE-JSON schema body

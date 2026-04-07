@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import Combine
 
 // MARK: - SessionError
@@ -219,6 +220,16 @@ final class SensorSession: ObservableObject {
                 .store(in: &cancellables)
 
             // ── Step 7: Start sensors ─────────────────────────────────────────
+            // Activate a background-compatible audio session so iOS keeps the app
+            // (and AVCaptureSession) running when the screen locks.
+            // .playAndRecord with .mixWithOthers = capture without interrupting other audio.
+            // This must be set before AVCaptureSession starts running.
+            let audioSession = AVAudioSession.sharedInstance()
+            try? audioSession.setCategory(.playAndRecord,
+                                          mode: .videoRecording,
+                                          options: [.mixWithOthers])
+            try? audioSession.setActive(true)
+
             try advance(to: "Starting sensors…")
 
             if needsOrientation {
@@ -405,6 +416,8 @@ final class SensorSession: ObservableObject {
         GarminManager.shared.stopRealTimeStreaming()
         cancellables.removeAll()
         publisher?.stopAll()
+        try? AVAudioSession.sharedInstance().setActive(false,
+            options: .notifyOthersOnDeactivation)
         for m in modules { m.stop() }
         for m in garminOutputs { m.stop() }
         orientCoord?.stop()

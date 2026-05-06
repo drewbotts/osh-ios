@@ -152,21 +152,13 @@ final class EulerOrientationOutput: SensorModule {
 
     func handleMotion(_ motion: CMDeviceMotion) {
         let sampleTime = Date().timeIntervalSince1970
-        let q = motion.attitude.quaternion
+        let attitude = motion.attitude
 
-        // Replicate Android's heading derivation:
-        //   look = (0, 1, 0)  rotated by quaternion => heading = 90 - atan2(look.y, look.x) degrees
-        //   clamped to (-180, 180]
-        let (lookX, lookY) = rotateY(by: q)
-        var heading = 90.0 - (atan2(lookY, lookX) * 180.0 / .pi)
-        if heading > 180.0 { heading -= 360.0 }
-
-        // Guard against NaN/Inf (simulator returns zero quaternions on cold start)
-        guard heading.isFinite else { return }
-
-        // Android pitch/roll are 0.0 in the current implementation (TODO in source)
-        let pitch = 0.0
-        let roll  = 0.0
+        let heading = attitude.yaw * 180.0 / .pi
+        let pitch = attitude.pitch * 180.0 / .pi
+        let roll  = attitude.roll * 180.0 / .pi
+        
+        guard heading.isFinite, pitch.isFinite, roll.isFinite else { return }
 
         let scalars: [Double] = [sampleTime, heading, pitch, roll]
         subject.send(Observation(datastreamName: outputName, payload: .scalar(scalars)))
@@ -215,7 +207,7 @@ final class OrientationOutputCoordinator {
         isStarted = true
         motionManager.deviceMotionUpdateInterval = 0.1
         motionManager.startDeviceMotionUpdates(
-            using: .xArbitraryZVertical,
+            using: .xTrueNorthZVertical,
             to: queue
         ) { [weak self] motion, error in
             guard let self = self, let motion = motion else { return }

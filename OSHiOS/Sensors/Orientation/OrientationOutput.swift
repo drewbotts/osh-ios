@@ -4,34 +4,26 @@ import Combine
 
 // MARK: - OrientationOutput
 //
-// iOS equivalent of AndroidOrientationQuatOutput + AndroidOrientationEulerOutput.
-// Produces two separate SensorModule outputs from one CMMotionManager instance.
+// Produces two SensorModule outputs from one shared CMMotionManager, owned by
+// OrientationOutputCoordinator. The coordinator is the single source of truth
+// for motion-update lifecycle; the output classes only consume CMDeviceMotion
+// samples via handleMotion(_:) and publish observations.
 //
 // ── Quaternion output ─────────────────────────────────────────────────────────
-// Mirrors AndroidOrientationQuatOutput:
 //   name       = "quat_orientation_data"
 //   definition = "http://sensorml.com/ont/swe/property/OrientationQuaternion"
-//   Fields: time, qx, qy, qz, q0  (ENU frame)
-//
-// Android stores: att.x, att.y, att.z, att.s  where s = scalar/w component.
-// The rotation-vector sensor components are:  rv[0]=x, rv[1]=y, rv[2]=z, rv[3]=w
-// CMQuaternion: x,y,z,w  — identical layout.
-// Coordinate frame: CMAttitude quaternion from CMMotionManager with .xArbitraryZVertical
-// reference gives orientation relative to a "device-up, arbitrary north" frame, which
-// is the closest iOS analog to the Android rotation vector (ENU convention).
+//   Fields: time, qx, qy, qz, q0
 //
 // ── Euler output ─────────────────────────────────────────────────────────────
-// Mirrors AndroidOrientationEulerOutput:
 //   name       = "euler_orientation_data"
 //   definition = "http://sensorml.com/ont/swe/property/OrientationEuler"
-//   Fields: time, heading (-180..180 deg), pitch (-90..90 deg), roll (-180..180 deg)
-//   heading uses DEF_HEADING_MAGNETIC
+//   Fields: time, heading (0..360 deg), pitch (-90..90 deg), roll (-180..180 deg)
 //
-// The Android Euler output derives heading/pitch/roll from the rotation-vector quaternion.
-// On iOS we compute the same from CMAttitude.quaternion using the same formula.
+// Reference frame: .xTrueNorthZVertical so heading is relative to geographic
+// north. Requires CLLocationManager to be running and authorized; if location
+// is unavailable, CoreMotion silently falls back to magnetic north.
 //
-// Update rate: Android caps at 10 Hz (max(minDelay, 100000 µs) = 100 ms).
-// We match that with a 0.1 s interval.
+// Update rate: 10 Hz, matching the Android driver.
 
 // MARK: - QuatOrientationOutput
 
@@ -154,7 +146,7 @@ final class EulerOrientationOutput: SensorModule {
         let sampleTime = Date().timeIntervalSince1970
         let attitude = motion.attitude
 
-        let heading = attitude.yaw * 180.0 / .pi
+        let heading = -attitude.yaw * 180.0 / .pi
         let pitch = attitude.pitch * 180.0 / .pi
         let roll  = attitude.roll * 180.0 / .pi
         

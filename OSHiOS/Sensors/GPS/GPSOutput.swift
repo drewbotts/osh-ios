@@ -20,7 +20,10 @@ import Combine
 // milliseconds-since-epoch / 1000 = seconds since Unix epoch (NOT J2000).
 // CLLocation.timestamp.timeIntervalSince1970 gives the same quantity on iOS.
 
-final class GPSOutput: NSObject, SensorModule {
+// @unchecked Sendable: CLLocationManager is not Sendable, but it is a `let` that
+// is only ever driven from the main actor (start/stop) and its delegate callbacks
+// arrive on the main queue, so there is no concurrent access to synchronise.
+final class GPSOutput: NSObject, SensorModule, @unchecked Sendable {
     let outputName: String
     let recordDescription: DataRecord
     let recommendedEncoding: BinaryEncoding
@@ -62,8 +65,23 @@ final class GPSOutput: NSObject, SensorModule {
     // MARK: SensorModule
 
     func start() throws {
-        locationManager.requestWhenInUseAuthorization()
-        locationManager.startUpdatingLocation()
+        // Fail fast on a hard denial: requesting again is a no-op once the user
+        // has said no, so without this check the session would report "streaming"
+        // while silently producing zero fixes.
+        let status = CLLocationManager().authorizationStatus
+        switch status {
+        case .denied, .restricted:
+            throw SensorError.unavailable("Location permission denied")
+
+        case .notDetermined:
+            // Ask now; updates begin for real in locationManagerDidChangeAuthorization
+            // once the user answers the prompt.
+            locationManager.requestWhenInUseAuthorization()
+            locationManager.startUpdatingLocation()
+
+        default:
+            locationManager.startUpdatingLocation()
+        }
     }
 
     func stop() {
@@ -98,6 +116,22 @@ extension GPSOutput: CLLocationManagerDelegate {
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // Non-fatal; just log.  Connectivity / permission issues surface here.
-        print("[GPSOutput] CLLocationManager error: \(error.localizedDescription)")
+        Log.sensors.error("CLLocationManager error: \(error.localizedDescription, privacy: .public)")
+    }
+
+    /// Called when the user answers the permission prompt raised by start(), and
+    /// on any later change in Settings. Starting updates here is what actually
+    /// gets the first fix flowing after a .notDetermined start.
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            Log.sensors.info("Location authorized — starting updates")
+            manager.startUpdatingLocation()
+        case .denied, .restricted:
+            Log.sensors.error("Location permission denied — GPS output will produce no data")
+            manager.stopUpdatingLocation()
+        default:
+            break
+        }
     }
 }

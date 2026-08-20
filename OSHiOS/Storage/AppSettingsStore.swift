@@ -6,6 +6,10 @@ import UIKit
 // ObservableObject that owns all persisted app-level settings.
 // Inject as @EnvironmentObject from osh_iosApp.
 
+// @MainActor: this is SwiftUI-facing observable state, read and written only
+// from views, and its default systemName comes from main-actor-isolated
+// UIDevice.current.
+@MainActor
 final class AppSettingsStore: ObservableObject {
 
     // MARK: - System name

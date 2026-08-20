@@ -17,7 +17,10 @@ import Combine
 // If the engine fails to start (permission denied, hardware unavailable),
 // start() throws SensorError.unavailable so the session continues without audio.
 
-final class AudioLevelOutput: SensorModule {
+// @unchecked Sendable: AVAudioEngine is a `let`; `isRunning` is only touched
+// from start()/stop() on the main actor, and the tap callback reads nothing
+// mutable beyond the subject, which serialises its own delivery.
+final class AudioLevelOutput: SensorModule, @unchecked Sendable {
     let outputName = "audio_level"
     let recordDescription: DataRecord
     let recommendedEncoding: BinaryEncoding

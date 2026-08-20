@@ -11,7 +11,10 @@ extension SensorModule {
     func configure() throws {}
 }
 
-protocol SensorModule: AnyObject {
+// Sendable: modules are handed to ObservationPublisher (an actor) so it can
+// subscribe to their publishers and inspect their encodings. Each conforming
+// class documents at its declaration why its internals are safe to share.
+protocol SensorModule: AnyObject, Sendable {
     /// Unique name used to match this output to its registered datastream.
     var outputName: String { get }
 

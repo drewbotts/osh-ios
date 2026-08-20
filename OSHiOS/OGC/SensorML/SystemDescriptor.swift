@@ -32,6 +32,11 @@ struct SystemDescriptor {
     /// - Parameters:
     ///   - systemName: Human-readable display name shown on the OSH node
     ///                 (from AppSettingsStore.systemName).
+    ///
+    /// @MainActor because UIDevice.current is main-actor isolated. Only the init
+    /// is constrained — the resulting value is an immutable bundle of Strings
+    /// that the ConnectedSystemsClient actor is free to consume.
+    @MainActor
     init(systemName: String) {
         let deviceUUID = UIDevice.current.identifierForVendor?.uuidString.lowercased()
             ?? UUID().uuidString.lowercased()

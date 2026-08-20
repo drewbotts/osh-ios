@@ -11,7 +11,6 @@ import Combine
 // Android settings replicated here:
 //   codec            : MIMETYPE_VIDEO_AVC → kCMVideoCodecType_H264
 //   bitrate mode     : VBR
-//   KEY_I_FRAME_INTERVAL : 1 second
 //   color format     : YUV420SemiPlanar (NV12)
 //   SPS/PPS          : prepended to every keyframe (Annex B)
 //   output format    : raw NAL units in Annex B (\x00\x00\x00\x01 start code)
@@ -20,8 +19,18 @@ import Combine
 // We convert to Annex B: replace each 4-byte length prefix with \x00\x00\x00\x01.
 // SPS/PPS extracted from format description on first keyframe and prepended to
 // every subsequent keyframe — matching Android's codecInfoData prepend pattern.
+//
+// Latency settings: MaxKeyFrameInterval = 1 makes every frame an IDR and
+// MaxFrameDelayCount = 0 forbids the encoder from holding frames back. Each
+// observation is therefore independently decodable, which is what the OSH node
+// needs since it stores frames as discrete observations with no GOP context —
+// a client subscribing mid-stream can decode the very next frame it receives.
+// The cost is a much higher bitrate than a normal GOP structure would use.
 
-final class VideoOutputH264: VideoOutput {
+// @unchecked Sendable restated from VideoOutput: the encoder state below
+// (compressionSession, spsPpsData, frameCount, encoderInitialized) is touched
+// only from the capture queue, and from stop() once capture has been halted.
+final class VideoOutputH264: VideoOutput, @unchecked Sendable {
 
     private var compressionSession: VTCompressionSession?
     private var spsPpsData: Data?
@@ -80,17 +89,15 @@ final class VideoOutputH264: VideoOutput {
         let w = CVPixelBufferGetWidth(pixelBuffer)
         let h = CVPixelBufferGetHeight(pixelBuffer)
 
-        // One-time log so dimensions can be confirmed during development
+        // Sanity log only. The datastream schema was already built from
+        // device.activeFormat in VideoOutput.configure() — registration happens
+        // long before the first frame arrives, so it cannot be corrected here.
+        // A mismatch means the active format changed after configure() and the
+        // registered schema is stale.
         if !hasDimensionsLogged {
             hasDimensionsLogged = true
-            print("[VideoOutputH264] First frame dimensions: \(w)×\(h) (CVPixelBuffer)")
+            Log.video.info("First frame dimensions: \(w)x\(h) (CVPixelBuffer)")
         }
-
-        // Update datastream schema to match the actual pixel buffer dimensions
-        let (schema, enc) = VideoCamHelper.newVideoOutputCODEC(
-            name: outputName, width: w, height: h, codec: Self.codecName)
-        recordDescription   = schema
-        recommendedEncoding = enc
 
         // Create compression session sized to actual pixel buffer dimensions
         var session: VTCompressionSession?
@@ -107,7 +114,7 @@ final class VideoOutputH264: VideoOutput {
             compressionSessionOut: &session
         )
         guard status == noErr, let session = session else {
-            print("[VideoOutputH264] VTCompressionSessionCreate failed: \(status)")
+            Log.video.error("VTCompressionSessionCreate failed: \(status)")
             return
         }
         self.compressionSession = session
@@ -117,10 +124,16 @@ final class VideoOutputH264: VideoOutput {
                              key: kVTCompressionPropertyKey_AllowFrameReordering,
                              value: kCFBooleanFalse)
 
-        // Keyframe interval = 1 second (matches Android KEY_I_FRAME_INTERVAL = 1)
+        // Emit every frame as soon as it is encoded — no lookahead buffering.
+        VTSessionSetProperty(session,
+                             key: kVTCompressionPropertyKey_MaxFrameDelayCount,
+                             value: NSNumber(value: 0))
+
+        // Keyframe every frame: each observation must be independently decodable
+        // because the OSH node stores frames as discrete observations.
         VTSessionSetProperty(session,
                              key: kVTCompressionPropertyKey_MaxKeyFrameInterval,
-                             value: config.frameRate as CFTypeRef)
+                             value: NSNumber(value: 1))
 
         // Bitrate (VBR — VideoToolbox default)
         VTSessionSetProperty(session,

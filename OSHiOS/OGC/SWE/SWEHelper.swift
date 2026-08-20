@@ -37,7 +37,12 @@ struct DataField {
 }
 
 /// Base protocol for all SWE data components.
-protocol DataComponent {
+///
+/// Sendable: schemas are immutable value descriptions that are handed to the
+/// ConnectedSystemsClient actor and the ObservationPublisher actor, so the
+/// existential must carry the guarantee. Every conforming type is a struct of
+/// Sendable members and picks the conformance up implicitly.
+protocol DataComponent: Sendable {
     var definition: String? { get }
     var label: String? { get }
 }

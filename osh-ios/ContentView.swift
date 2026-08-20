@@ -87,6 +87,17 @@ struct ContentView: View {
                     .foregroundStyle(.orange)
             }
 
+            if case .streaming = session.state {
+                LabeledContent("Sent", value: "\(session.sentCount)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if session.errorCount > 0 {
+                    LabeledContent("Failed posts", value: "\(session.errorCount)")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
+            }
+
             if !session.sensorStatus.isEmpty {
                 ForEach(session.sensorStatus.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
                     let unavailable = value.hasPrefix("Unavailable:")
@@ -168,11 +179,12 @@ struct ContentView: View {
                 .padding(.vertical, 4)
             }
 
-            // Debug helper — only shown after a failed startup
-            if case .failed = session.state {
+            // Debug helper — only shown after a failed startup.
+            // Registration ids are cached per server, so clear only the active one.
+            if case .failed = session.state, let serverId = settings.activeServer?.id {
                 Button("Reset cached registration") {
-                    SystemRegistration.clearCachedId()
-                    DatastreamRegistration.clearCachedIds()
+                    SystemRegistration.clearCachedId(serverId: serverId)
+                    DatastreamRegistration.clearCachedIds(serverId: serverId)
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)

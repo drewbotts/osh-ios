@@ -20,6 +20,25 @@ actor ConnectedSystemsClient {
     private let authHeader: String
     private let session: URLSession
 
+    // MARK: Shared timestamp formatter
+    //
+    // Observations are formatted at sensor rate (10 Hz orientation, plus every
+    // batched GPS/barometer/audio record), and allocating an ISO8601DateFormatter
+    // per observation is pure overhead. Fractional seconds are required: without
+    // them two records inside the same second collapse to an identical
+    // phenomenonTime and the OSH node treats the later one as a duplicate.
+    //
+    // Sharing one instance is safe even though ISO8601DateFormatter is not
+    // Sendable: formatOptions are set once here and never mutated afterwards,
+    // and Foundation documents string(from:) as thread-safe for concurrent
+    // formatting. Keeping it static (rather than an actor-isolated instance
+    // property) is what lets the JSON builders below stay `nonisolated`.
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
     // MARK: Init
 
     init(nodeURL: String, username: String, password: String) throws {
@@ -111,6 +130,42 @@ actor ConnectedSystemsClient {
         }
     }
 
+    // MARK: - Post a batch of observations
+    //
+    // POST /datastreams/{datastreamId}/observations  with a JSON *array* body:
+    //   [ {...}, {...}, ... ]
+    //
+    // Each element is the same ordered swe+json object that postObservation()
+    // sends for a single scalar record, so the server's streaming parser reads
+    // them with the identical field ordering. Batching cuts one HTTP round-trip
+    // per sensor sample down to one per flush interval.
+    //
+    // Video (.video payloads) is not supported here — frames are posted one at a
+    // time as application/swe+binary via postObservation.
+
+    func postObservations(datastreamId: String,
+                          observations: [Observation],
+                          schema: DataRecord?) async throws {
+        guard !observations.isEmpty else { return }
+
+        var objects: [String] = []
+        objects.reserveCapacity(observations.count)
+        for observation in observations {
+            guard case .scalar(let values) = observation.payload, !values.isEmpty else { continue }
+            objects.append(scalarObsObject(values: values, schema: schema))
+        }
+        guard !objects.isEmpty else { return }
+
+        let body = "[" + objects.joined(separator: ",") + "]"
+        guard let data = body.data(using: .utf8) else { throw ClientError.encodingFailed }
+
+        let url = baseURL
+            .appendingPathComponent("datastreams")
+            .appendingPathComponent(datastreamId)
+            .appendingPathComponent("observations")
+        try await postRaw(url: url, body: data, contentType: "application/swe+json")
+    }
+
     // MARK: - JSON builders
     //
     // All JSON is built as ordered strings because the server's Gson streaming parser
@@ -128,7 +183,7 @@ actor ConnectedSystemsClient {
     ///   • recordSchema: DataRecord with time + img DataArray (full pixel structure)
     ///   • recordEncoding: BinaryEncoding — /time=scalar double, /img=BinaryBlock(codec)
     ///   • Wire format: 8-byte big-endian Double timestamp + compressed frame bytes
-    private func buildDatastreamJSON(
+    nonisolated func buildDatastreamJSON(
         name: String,
         schema: DataRecord,
         encoding: BinaryEncoding
@@ -172,7 +227,7 @@ actor ConnectedSystemsClient {
     /// The OSH Gson streaming parser requires "type" as the first key everywhere.
     /// - rootLevel: when true (top-level recordSchema), omits "name" and "label" —
     ///   the server derives the name from the datastream outputName.
-    private func sweRecordToJSON(_ record: DataRecord, rootLevel: Bool = false) -> String {
+    nonisolated private func sweRecordToJSON(_ record: DataRecord, rootLevel: Bool = false) -> String {
         var s = "{"
         s += jkv("type", "DataRecord")
         if !rootLevel { s += "," + jkv("name", record.name) }
@@ -186,13 +241,13 @@ actor ConnectedSystemsClient {
 
     /// Serialises a DataField as a flat SWE-JSON component object:
     ///   { "type":"<T>", "name":"<fieldName>", ...component properties... }
-    private func sweFieldToJSON(_ field: DataField) -> String {
+    nonisolated private func sweFieldToJSON(_ field: DataField) -> String {
         sweComponentToJSON(field.component, name: field.name)
     }
 
     /// Serialises a DataComponent with "type" first, then "name", then properties.
     /// The name parameter is the containing field's or coordinate's name.
-    private func sweComponentToJSON(_ component: DataComponent, name: String) -> String {
+    nonisolated private func sweComponentToJSON(_ component: DataComponent, name: String) -> String {
         switch component {
         case let t as TimeStamp:
             var s = "{"
@@ -278,7 +333,7 @@ actor ConnectedSystemsClient {
         }
     }
 
-    private func binaryEncodingToJSON(_ enc: BinaryEncoding) -> String {
+    nonisolated private func binaryEncodingToJSON(_ enc: BinaryEncoding) -> String {
         var s = "{"
         s += jkv("type", "BinaryEncoding")
         s += "," + jkv("byteOrder", enc.byteOrder)
@@ -306,10 +361,10 @@ actor ConnectedSystemsClient {
     // MARK: - JSON string helpers
 
     /// Quoted JSON key.
-    private func jq(_ key: String) -> String { "\"\(key)\"" }
+    nonisolated private func jq(_ key: String) -> String { "\"\(key)\"" }
 
     /// Minimal JSON string escaping.
-    private func jEscape(_ s: String) -> String {
+    nonisolated private func jEscape(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\")
          .replacingOccurrences(of: "\"", with: "\\\"")
          .replacingOccurrences(of: "\n", with: "\\n")
@@ -318,7 +373,7 @@ actor ConnectedSystemsClient {
     }
 
     /// Key-value pair: `"key":"value"`.
-    private func jkv(_ key: String, _ value: String) -> String {
+    nonisolated private func jkv(_ key: String, _ value: String) -> String {
         "\(jq(key)):\(jq(jEscape(value)))"
     }
 
@@ -346,24 +401,29 @@ actor ConnectedSystemsClient {
     /// each field by name in sequence.
     ///
     /// Example (GPS): {"time":1234567890.123,"location":{"lat":37.5,"lon":-122.0,"alt":100.0}}
-    private func buildScalarObsJSON(values: [Double], schema: DataRecord?) throws -> Data {
+    nonisolated private func buildScalarObsJSON(values: [Double], schema: DataRecord?) throws -> Data {
         guard !values.isEmpty else { throw ClientError.emptyPayload }
 
-        let s: String
-        if let schema = schema {
-            s = buildResultJSON(schema: schema, values: values)
-        } else {
-            // Fallback (no schema): flat array
-            s = "[" + values.map { String($0) }.joined(separator: ",") + "]"
+        guard let data = scalarObsObject(values: values, schema: schema).data(using: .utf8) else {
+            throw ClientError.encodingFailed
         }
-
-        guard let data = s.data(using: .utf8) else { throw ClientError.encodingFailed }
         return data
+    }
+
+    /// Serialises one scalar observation as a single swe+json object string.
+    /// Shared by the single-observation and batch POST paths so both emit
+    /// byte-identical field ordering.
+    nonisolated private func scalarObsObject(values: [Double], schema: DataRecord?) -> String {
+        guard let schema else {
+            // Fallback (no schema): flat array
+            return "[" + values.map { String($0) }.joined(separator: ",") + "]"
+        }
+        return buildResultJSON(schema: schema, values: values)
     }
 
     /// Traverses the DataRecord schema and serialises values in schema-defined order.
     /// All fields including time are included; values[0] maps to the time field.
-    private func buildResultJSON(schema: DataRecord, values: [Double]) -> String {
+    nonisolated func buildResultJSON(schema: DataRecord, values: [Double]) -> String {
         var s = "{"
         var idx = 0
         var firstField = true
@@ -373,7 +433,7 @@ actor ConnectedSystemsClient {
             switch field.component {
             case is TimeStamp:
                 if idx < values.count {
-                    let iso = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: values[idx]))
+                    let iso = Self.isoFormatter.string(from: Date(timeIntervalSince1970: values[idx]))
                     s += jq(field.name) + ":" + jq(iso)
                     idx += 1
                 }
@@ -406,7 +466,7 @@ actor ConnectedSystemsClient {
     ///   [8 bytes] big-endian Double  — Unix wall-clock timestamp
     ///   [4 bytes] big-endian UInt32  — byte length of the compressed frame
     ///   [N bytes] compressed frame   — H264 Annex-B or JPEG bytes
-    private func buildBinaryObsBody(timestamp: Double, frame: Data) -> Data {
+    nonisolated private func buildBinaryObsBody(timestamp: Double, frame: Data) -> Data {
         var ts  = timestamp.bitPattern.bigEndian
         var len = UInt32(frame.count).bigEndian
         var body = Data(bytes: &ts,  count: 8)

@@ -15,7 +15,10 @@ import Combine
 // If the hardware is absent, start() returns without throwing so the session
 // continues with whatever other sensors are available.
 
-final class BarometerOutput: SensorModule {
+// @unchecked Sendable: CMAltimeter is a `let` driven only from the main actor;
+// its update handler is delivered on the main queue and the subject serialises
+// its own delivery, so there is no unsynchronised shared mutable state.
+final class BarometerOutput: SensorModule, @unchecked Sendable {
     let outputName = "barometer"
     let recordDescription: DataRecord
     let recommendedEncoding: BinaryEncoding
@@ -65,7 +68,7 @@ final class BarometerOutput: SensorModule {
 
     func start() throws {
         guard CMAltimeter.isRelativeAltitudeAvailable() else {
-            print("[BarometerOutput] Relative altitude not available on this device")
+            Log.sensors.info("Relative altitude not available on this device")
             return
         }
         altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in

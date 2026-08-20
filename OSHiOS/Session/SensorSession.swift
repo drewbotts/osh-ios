@@ -38,8 +38,13 @@ final class SensorSession: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var sensorStatus: [String: String] = [:]
-    /// False while streaming if the network path is unavailable (observations are buffering).
+    /// False while streaming if the network path or the OSH node is unavailable
+    /// (observations are buffering in ObservationPublisher's ring buffer).
     @Published private(set) var isNetworkConnected = true
+    /// Observations successfully accepted by the server this session.
+    @Published private(set) var sentCount = 0
+    /// Failed POST batches this session.
+    @Published private(set) var errorCount = 0
 
     // MARK: - Private
 
@@ -49,6 +54,8 @@ final class SensorSession: ObservableObject {
     private var publisher: ObservationPublisher?
     private var cancellables = Set<AnyCancellable>()
     private var runTask: Task<Void, Never>?
+    /// Mirrors ObservationPublisher's status stream into the @Published properties above.
+    private var statusTask: Task<Void, Never>?
 
     // MARK: - Public API
 
@@ -69,6 +76,8 @@ final class SensorSession: ObservableObject {
         cleanupModules()
         sensorStatus = [:]
         isNetworkConnected = true
+        sentCount = 0
+        errorCount = 0
         state = .idle
     }
 
@@ -144,6 +153,7 @@ final class SensorSession: ObservableObject {
             try advance(to: "Registering system…")
             let systemId = try await SystemRegistration.registerIfNeeded(
                 client: client,
+                serverId: server.id,
                 descriptor: descriptor
             )
 
@@ -167,8 +177,11 @@ final class SensorSession: ObservableObject {
             for module in builtModules {
                 let dsId = try await DatastreamRegistration.registerIfNeeded(
                     client: client,
+                    serverId: server.id,
                     systemId: systemId,
-                    module: module
+                    outputName: module.outputName,
+                    schema: module.recordDescription,
+                    encoding: module.recommendedEncoding
                 )
                 datastreamIds[module.outputName] = dsId
             }
@@ -180,28 +193,49 @@ final class SensorSession: ObservableObject {
             }
 
             let pub = ObservationPublisher()
-            pub.configure(client: client, systemId: systemId,
-                          datastreamIds: datastreamIds,
-                          datastreamSchemas: datastreamSchemas)
-            pub.subscribe(to: builtModules)
-            pub.startNetworkMonitoring()
+            await pub.configure(client: client, systemId: systemId,
+                                datastreamIds: datastreamIds,
+                                datastreamSchemas: datastreamSchemas)
+            // Scalar sensors only — pub skips binary-block modules, and video is
+            // wired to its own direct-post path below.
+            await pub.subscribe(to: builtModules)
+            await pub.startNetworkMonitoring()
             self.publisher = pub
 
-            pub.$queuedCount
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] count in
-                    if count > 0 {
-                        self?.sensorStatus["queue"] = "\(count) buffered"
-                    } else {
-                        self?.sensorStatus.removeValue(forKey: "queue")
+            // Video bypasses ObservationPublisher entirely: frames go straight to
+            // the server so a multi-hundred-KB payload never enters the scalar
+            // ring buffer or batch array.
+            for module in builtModules {
+                guard let video = module as? VideoOutput,
+                      let dsId = datastreamIds[video.outputName] else { continue }
+                let schema = video.recordDescription
+                video.directPoster = { observation in
+                    do {
+                        try await client.postObservation(datastreamId: dsId,
+                                                         observation: observation,
+                                                         schema: schema)
+                    } catch {
+                        Log.video.error("Frame POST failed: \(error.localizedDescription, privacy: .public)")
                     }
                 }
-                .store(in: &cancellables)
+            }
 
-            pub.$isConnected
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] connected in self?.isNetworkConnected = connected }
-                .store(in: &cancellables)
+            // Mirror publisher health into @Published state for the UI.
+            // Task inherits this @MainActor isolation, so the assignments are safe.
+            let statusStream = await pub.status
+            statusTask = Task { [weak self] in
+                for await status in statusStream {
+                    guard let self else { return }
+                    self.isNetworkConnected = status.isConnected
+                    self.sentCount  = status.sentCount
+                    self.errorCount = status.errorCount
+                    if status.queuedCount > 0 {
+                        self.sensorStatus["queue"] = "\(status.queuedCount) buffered"
+                    } else {
+                        self.sensorStatus.removeValue(forKey: "queue")
+                    }
+                }
+            }
 
             // ── Step 7: Start sensors ─────────────────────────────────────────
             try advance(to: "Starting sensors…")
@@ -258,8 +292,17 @@ final class SensorSession: ObservableObject {
 
     private func cleanupModules() {
         cancellables.removeAll()
-        publisher?.stopAll()
-        for m in modules { m.stop() }
+        statusTask?.cancel()
+        statusTask = nil
+        // stopAll() is actor-isolated; hand the publisher to a detached hop so
+        // cleanup stays synchronous for the defer in run() and for stop().
+        if let pub = publisher {
+            Task { await pub.stopAll() }
+        }
+        for module in modules {
+            (module as? VideoOutput)?.directPoster = nil
+            module.stop()
+        }
         orientCoord?.stop()
         modules      = []
         orientCoord  = nil

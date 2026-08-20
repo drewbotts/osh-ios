@@ -5,9 +5,29 @@ import Combine
 // MARK: - OrientationOutput
 //
 // Produces two SensorModule outputs from one shared CMMotionManager, owned by
-// OrientationOutputCoordinator. The coordinator is the single source of truth
-// for motion-update lifecycle; the output classes only consume CMDeviceMotion
-// samples via handleMotion(_:) and publish observations.
+// OrientationOutputCoordinator. The coordinator is the single source of truth for
+// the motion-update lifecycle: it creates the CMMotionManager, starts and stops
+// device-motion updates, and fans each CMDeviceMotion sample out to both outputs
+// via handleMotion(_:). The output classes hold no motion hardware at all — their
+// start()/stop() are deliberate no-ops.
+//
+// ── Reference frame ──────────────────────────────────────────────────────────
+// Updates are requested with CMAttitudeReferenceFrame.xTrueNorthZVertical:
+//   • Z points up along the gravity vector (vertical).
+//   • X points to geographic (true) north, not magnetic north — CoreMotion applies
+//     the local magnetic declination using the device's location.
+//   • Y completes the right-handed frame (west).
+// This frame requires both the magnetometer and an active, authorized
+// CLLocationManager. Without a location fix CoreMotion silently degrades to
+// magnetic north, so GPSOutput should be running for headings to be true-north
+// referenced.
+//
+// ── Heading convention ───────────────────────────────────────────────────────
+// CMAttitude.yaw is the rotation about the vertical axis in radians, measured
+// counter-clockwise and reported in (-π, π]. A compass heading runs clockwise
+// from north over [0, 360), so we negate, convert to degrees, and wrap:
+//     heading = (-yaw · 180/π) mod 360, shifted into [0, 360)
+// giving 0° = true north, 90° = east, 180° = south, 270° = west.
 //
 // ── Quaternion output ─────────────────────────────────────────────────────────
 //   name       = "quat_orientation_data"
@@ -19,15 +39,14 @@ import Combine
 //   definition = "http://sensorml.com/ont/swe/property/OrientationEuler"
 //   Fields: time, heading (0..360 deg), pitch (-90..90 deg), roll (-180..180 deg)
 //
-// Reference frame: .xTrueNorthZVertical so heading is relative to geographic
-// north. Requires CLLocationManager to be running and authorized; if location
-// is unavailable, CoreMotion silently falls back to magnetic north.
-//
 // Update rate: 10 Hz, matching the Android driver.
 
 // MARK: - QuatOrientationOutput
 
-final class QuatOrientationOutput: SensorModule {
+// @unchecked Sendable: the only mutable state is the PassthroughSubject, which
+// serialises its own delivery; handleMotion(_:) is called from the coordinator's
+// single-width OperationQueue and never concurrently with itself.
+final class QuatOrientationOutput: SensorModule, @unchecked Sendable {
     let outputName = "quat_orientation_data"
     let recordDescription: DataRecord
     let recommendedEncoding: BinaryEncoding
@@ -36,12 +55,7 @@ final class QuatOrientationOutput: SensorModule {
     private let subject = PassthroughSubject<Observation, Never>()
     var publisher: AnyPublisher<Observation, Never> { subject.eraseToAnyPublisher() }
 
-    private weak var motionManager: CMMotionManager?
-    private let queue: OperationQueue
-
-    init(motionManager: CMMotionManager, queue: OperationQueue, localFrameURI: String) {
-        self.motionManager = motionManager
-        self.queue = queue
+    init(localFrameURI: String) {
         self.recordDescription = GeoPosHelper.newQuatOrientationRecord(
             name: outputName,
             localFrameURI: localFrameURI
@@ -55,23 +69,13 @@ final class QuatOrientationOutput: SensorModule {
         ])
     }
 
-    func start() throws {
-        guard let mm = motionManager, mm.isDeviceMotionAvailable else {
-            throw SensorError.unavailable("Device motion not available")
-        }
-        mm.deviceMotionUpdateInterval = averageSamplingPeriod
-        mm.startDeviceMotionUpdates(
-            using: .xArbitraryZVertical,
-            to: queue
-        ) { [weak self] motion, error in
-            guard let self = self, let motion = motion else { return }
-            self.handleMotion(motion)
-        }
-    }
+    /// No-op: OrientationOutputCoordinator owns the CMMotionManager and starts
+    /// device-motion updates for both orientation outputs.
+    func start() throws {}
 
-    func stop() {
-        motionManager?.stopDeviceMotionUpdates()
-    }
+    /// No-op: OrientationOutputCoordinator owns the CMMotionManager and stops
+    /// device-motion updates for both orientation outputs.
+    func stop() {}
 
     func handleMotion(_ motion: CMDeviceMotion) {
         let sampleTime = Date().timeIntervalSince1970
@@ -90,7 +94,8 @@ final class QuatOrientationOutput: SensorModule {
 
 // MARK: - EulerOrientationOutput
 
-final class EulerOrientationOutput: SensorModule {
+// @unchecked Sendable: see QuatOrientationOutput — same reasoning.
+final class EulerOrientationOutput: SensorModule, @unchecked Sendable {
     let outputName = "euler_orientation_data"
     let recordDescription: DataRecord
     let recommendedEncoding: BinaryEncoding
@@ -99,12 +104,7 @@ final class EulerOrientationOutput: SensorModule {
     private let subject = PassthroughSubject<Observation, Never>()
     var publisher: AnyPublisher<Observation, Never> { subject.eraseToAnyPublisher() }
 
-    private weak var motionManager: CMMotionManager?
-    private let queue: OperationQueue
-
-    init(motionManager: CMMotionManager, queue: OperationQueue, localFrameURI: String) {
-        self.motionManager = motionManager
-        self.queue = queue
+    init(localFrameURI: String) {
         self.recordDescription = GeoPosHelper.newEulerOrientationRecord(
             name: outputName,
             localFrameURI: localFrameURI
@@ -117,54 +117,35 @@ final class EulerOrientationOutput: SensorModule {
         ])
     }
 
-    func start() throws {
-        guard let mm = motionManager, mm.isDeviceMotionAvailable else {
-            throw SensorError.unavailable("Device motion not available")
-        }
-        // Motion updates are shared with QuatOrientationOutput — only start if not running.
-        if !mm.isDeviceMotionActive {
-            mm.deviceMotionUpdateInterval = averageSamplingPeriod
-            mm.startDeviceMotionUpdates(
-                using: .xArbitraryZVertical,
-                to: queue
-            ) { [weak self] motion, error in
-                guard let self = self, let motion = motion else { return }
-                self.handleMotion(motion)
-            }
-        } else {
-            // Already running from QuatOrientationOutput; attach via a separate handler.
-            // In practice, the coordinator (SensorModule manager) should share the subscription.
-            // This stub satisfies the protocol; the coordinator wires things properly.
-        }
-    }
+    /// No-op: OrientationOutputCoordinator owns the CMMotionManager and starts
+    /// device-motion updates for both orientation outputs.
+    func start() throws {}
 
-    func stop() {
-        // Motion manager is shared; do not stop it here — coordinator handles lifecycle.
+    /// No-op: OrientationOutputCoordinator owns the CMMotionManager and stops
+    /// device-motion updates for both orientation outputs.
+    func stop() {}
+
+    /// Converts a CMAttitude yaw (radians, counter-clockwise, (-π, π]) into a
+    /// compass heading in degrees clockwise from true north, normalized to [0, 360).
+    static func normalizedHeading(fromYaw yaw: Double) -> Double {
+        var heading = -yaw * 180 / .pi
+        heading = heading.truncatingRemainder(dividingBy: 360)
+        if heading < 0 { heading += 360 }
+        return heading
     }
 
     func handleMotion(_ motion: CMDeviceMotion) {
         let sampleTime = Date().timeIntervalSince1970
         let attitude = motion.attitude
 
-        let heading = -attitude.yaw * 180.0 / .pi
+        let heading = Self.normalizedHeading(fromYaw: attitude.yaw)
         let pitch = attitude.pitch * 180.0 / .pi
         let roll  = attitude.roll * 180.0 / .pi
-        
+
         guard heading.isFinite, pitch.isFinite, roll.isFinite else { return }
 
         let scalars: [Double] = [sampleTime, heading, pitch, roll]
         subject.send(Observation(datastreamName: outputName, payload: .scalar(scalars)))
-    }
-
-    // Rotate the Y-axis unit vector (0,1,0) by quaternion q — same math as Android.
-    // Returns (lookX, lookY).
-    // Derivation for v=(0,1,0):
-    //   rx = 2*(qx*qy + qw*qz)
-    //   ry = qw^2 - qx^2 + qy^2 - qz^2
-    private func rotateY(by q: CMQuaternion) -> (Double, Double) {
-        let rx = 2.0 * (q.x * q.y + q.w * q.z)
-        let ry = q.w * q.w - q.x * q.x + q.y * q.y - q.z * q.z
-        return (rx, ry)
     }
 }
 
@@ -187,8 +168,8 @@ final class OrientationOutputCoordinator {
     private var isStarted = false
 
     init(localFrameURI: String) {
-        quatOutput  = QuatOrientationOutput(motionManager: motionManager, queue: queue, localFrameURI: localFrameURI)
-        eulerOutput = EulerOrientationOutput(motionManager: motionManager, queue: queue, localFrameURI: localFrameURI)
+        quatOutput  = QuatOrientationOutput(localFrameURI: localFrameURI)
+        eulerOutput = EulerOrientationOutput(localFrameURI: localFrameURI)
     }
 
     func start() throws {
@@ -198,11 +179,19 @@ final class OrientationOutputCoordinator {
         }
         isStarted = true
         motionManager.deviceMotionUpdateInterval = 0.1
+        // .xTrueNorthZVertical needs an authorized, running CLLocationManager to
+        // resolve magnetic declination; without one CoreMotion falls back to
+        // magnetic north silently.
         motionManager.startDeviceMotionUpdates(
             using: .xTrueNorthZVertical,
             to: queue
         ) { [weak self] motion, error in
-            guard let self = self, let motion = motion else { return }
+            guard let self else { return }
+            if let error {
+                Log.sensors.error("Device motion error: \(error.localizedDescription, privacy: .public)")
+                return
+            }
+            guard let motion else { return }
             self.quatOutput.handleMotion(motion)
             self.eulerOutput.handleMotion(motion)
         }

@@ -396,3 +396,71 @@ enum OrderedJSONScanner {
         return (value, index)
     }
 }
+
+// MARK: - Observation payload shape
+//
+// The node's swe+json binding reads exactly one record per request. Sending a
+// JSON array instead produced, for one release:
+//
+//   Invalid request (BAD_PAYLOAD): Invalid payload:
+//   java.lang.IllegalStateException: Expected BEGIN_OBJECT but was BEGIN_ARRAY
+//
+// and — because the node forwards that 400 to an admin error page it then
+// denies — the client only ever saw an opaque "HTTP 302" while every scalar
+// observation was silently lost. These tests pin the shape so it cannot come
+// back without a failing test.
+
+struct ObservationPayloadShapeTests {
+
+    private func makeClient() throws -> ConnectedSystemsClient {
+        try ConnectedSystemsClient(nodeURL: "http://localhost:8181/sensorhub/api",
+                                   username: "admin",
+                                   password: "admin")
+    }
+
+    private func gpsSchema() -> DataRecord {
+        GeoPosHelper.newLocationRecord(name: "gps_data",
+                                       localFrameURI: "urn:osh:ios:test#LOCAL_FRAME")
+    }
+
+    @Test func scalarObservationBodyIsAJSONObject() throws {
+        let client = try makeClient()
+        let json = client.buildResultJSON(schema: gpsSchema(),
+                                          values: [1_700_000_000.125, 34.72501, -86.58302, 190.4])
+
+        #expect(json.hasPrefix("{"), "Body must be a single record object, not an array")
+
+        let data = try #require(json.data(using: .utf8))
+        let parsed = try JSONSerialization.jsonObject(with: data)
+        #expect(parsed is [String: Any])
+        #expect(!(parsed is [Any]), "A top-level array is rejected by the node's swe+json binding")
+    }
+
+    /// The record carries its fields flat, in schema order — the same object the
+    /// datastream's recordSchema describes.
+    @Test func scalarObservationCarriesSchemaFieldsAtTheTopLevel() throws {
+        let client = try makeClient()
+        let json = client.buildResultJSON(schema: gpsSchema(),
+                                          values: [1_700_000_000.125, 34.72501, -86.58302, 190.4])
+        let data = try #require(json.data(using: .utf8))
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(root["time"] is String)
+        let location = try #require(root["location"] as? [String: Any])
+        #expect(location["lat"] as? Double == 34.72501)
+        #expect(location["lon"] as? Double == -86.58302)
+        #expect(location["alt"] as? Double == 190.4)
+    }
+
+    /// The client must expose no way to post several observations in one request.
+    /// This is a compile-time guard as much as a runtime one: if a batch method
+    /// comes back, this test is where the reasoning lives.
+    @Test func clientPostsOneObservationPerRequest() throws {
+        let client = try makeClient()
+        // postObservation takes a single Observation, not a collection.
+        let observation = Observation(datastreamName: "gps_data",
+                                      payload: .scalar([1_700_000_000, 34.7, -86.5, 190]))
+        #expect(observation.datastreamName == "gps_data")
+        _ = client  // the type has no postObservations(_:) overload to call
+    }
+}

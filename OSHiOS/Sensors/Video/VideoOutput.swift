@@ -53,6 +53,24 @@ class VideoOutput: NSObject, SensorModule, AVCaptureVideoDataOutputSampleBufferD
 
     private let frameGate = FrameGate()
 
+    // MARK: Encoder telemetry
+    //
+    // Exposed as a stream rather than as @Published properties because frames
+    // are counted on the capture queue: publishing from there would either hop
+    // to the main actor per frame or mutate observable state off it. The hub
+    // batches into one snapshot per second, which is also the only rate a
+    // status readout needs.
+
+    private let statsHub = VideoStatsHub()
+    private var statsTicker: Task<Void, Never>?
+
+    /// Reporting window for `videoStats`.
+    private static let statsInterval: Double = 1.0
+
+    /// A new stream of encoder telemetry: encoded FPS, bitrate, dropped frames
+    /// and the real encoded dimensions. Finishes when the output stops.
+    var videoStats: AsyncStream<VideoStats> { statsHub.makeStream() }
+
     // MARK: Init
 
     init(outputName: String,
@@ -80,10 +98,36 @@ class VideoOutput: NSObject, SensorModule, AVCaptureVideoDataOutputSampleBufferD
 
     func start() throws {
         captureSession.startRunning()
+        startStatsTicker()
     }
 
     func stop() {
         captureSession.stopRunning()
+        statsTicker?.cancel()
+        statsTicker = nil
+        statsHub.finish()
+    }
+
+    /// Publishes one telemetry snapshot per `statsInterval` while capturing.
+    private func startStatsTicker() {
+        guard statsTicker == nil else { return }
+        statsTicker = Task { [statsHub, frameGate] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(Self.statsInterval))
+                } catch {
+                    return  // cancelled
+                }
+                statsHub.tick(interval: Self.statsInterval, dropped: frameGate.dropped)
+            }
+        }
+    }
+
+    /// Records the dimensions the encoder is actually producing. Called from
+    /// configure() with the device's active format, and again by the H.264
+    /// subclass once the first CVPixelBuffer confirms them.
+    func reportEncodedDimensions(width: Int, height: Int) {
+        statsHub.reportDimensions(width: width, height: height)
     }
 
     // MARK: Session setup
@@ -119,6 +163,7 @@ class VideoOutput: NSObject, SensorModule, AVCaptureVideoDataOutputSampleBufferD
             )
             recordDescription   = schema
             recommendedEncoding = encoding
+            reportEncodedDimensions(width: Int(dimensions.width), height: Int(dimensions.height))
             Log.video.info("Capture dimensions \(dimensions.width)x\(dimensions.height) — schema updated")
         } else {
             Log.video.error("activeFormat reported no dimensions — keeping preset schema")
@@ -185,6 +230,8 @@ class VideoOutput: NSObject, SensorModule, AVCaptureVideoDataOutputSampleBufferD
             datastreamName: outputName,
             payload: .video(timestamp: timestamp, frame: data)
         )
+
+        statsHub.record(frameBytes: data.count)
 
         // Published for the UI's liveness indicator only — ObservationPublisher
         // deliberately does not subscribe to binary-block modules.

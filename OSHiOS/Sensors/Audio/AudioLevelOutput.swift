@@ -5,7 +5,7 @@ import Combine
 // MARK: - AudioLevelOutput
 //
 // Captures ambient sound level from the microphone using AVAudioEngine.
-// Publishes RMS dB and peak dB at ~10 Hz (0.1 s buffer tap).
+// Publishes RMS dB and peak dB at the configured interval (default 0.1 s tap).
 // Does NOT store or transmit raw audio samples — dB scalars only.
 //
 // SWE schema field order (must match values array order exactly):
@@ -24,7 +24,9 @@ final class AudioLevelOutput: SensorModule, @unchecked Sendable {
     let outputName = "audio_level"
     let recordDescription: DataRecord
     let recommendedEncoding: BinaryEncoding
-    let averageSamplingPeriod: Double = 0.1
+    /// Tap buffer duration, from AppConfig.audioInterval. The datastream is
+    /// registered with this value, so the node is told the rate it will get.
+    let averageSamplingPeriod: Double
 
     private let subject = PassthroughSubject<Observation, Never>()
     var publisher: AnyPublisher<Observation, Never> { subject.eraseToAnyPublisher() }
@@ -34,7 +36,8 @@ final class AudioLevelOutput: SensorModule, @unchecked Sendable {
 
     // MARK: Init
 
-    init() {
+    init(samplingPeriod: Double = 0.1) {
+        self.averageSamplingPeriod = samplingPeriod
         self.recordDescription = DataRecord(
             definition: "http://sensorml.com/ont/swe/property/SoundLevel",
             label: "Audio Level",

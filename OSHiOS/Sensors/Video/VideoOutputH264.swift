@@ -98,6 +98,9 @@ final class VideoOutputH264: VideoOutput, @unchecked Sendable {
             hasDimensionsLogged = true
             Log.video.info("First frame dimensions: \(w)x\(h) (CVPixelBuffer)")
         }
+        // Telemetry reports what the encoder really produces, which is the
+        // pixel buffer size — not the preset the user picked.
+        reportEncodedDimensions(width: w, height: h)
 
         // Create compression session sized to actual pixel buffer dimensions
         var session: VTCompressionSession?

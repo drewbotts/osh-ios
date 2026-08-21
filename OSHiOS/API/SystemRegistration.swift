@@ -40,6 +40,13 @@ struct SystemRegistration {
         return id
     }
 
+    /// The system id cached for this server, or nil if the device has not
+    /// registered with it yet. Read-only — the Node tab shows it.
+    static func cachedId(serverId: UUID) -> String? {
+        let id = UserDefaults.standard.string(forKey: defaultsKey(serverId: serverId))
+        return (id?.isEmpty ?? true) ? nil : id
+    }
+
     static func clearCachedId(serverId: UUID) {
         UserDefaults.standard.removeObject(forKey: defaultsKey(serverId: serverId))
     }

@@ -109,11 +109,16 @@ actor ConnectedSystemsClient {
 
     // MARK: - Post observation
     //
-    // POST /datastreams/{datastreamId}/observations
-    // Scalar (GPS, orientation): O&M JSON  →  application/om+json
+    // POST /datastreams/{datastreamId}/observations — one observation per request.
+    // Scalar (GPS, orientation): SWE JSON   →  application/swe+json
     // Video:                     SWE binary →  application/swe+binary
+    //
+    // Both match the obsFormat the datastream was registered with, which is what
+    // the node uses to pick its binding.
 
-    func postObservation(datastreamId: String, observation: Observation, schema: DataRecord?) async throws {
+    /// - Returns: the number of body bytes sent, for the caller's throughput stats.
+    @discardableResult
+    func postObservation(datastreamId: String, observation: Observation, schema: DataRecord?) async throws -> Int {
         let url = baseURL
             .appendingPathComponent("datastreams")
             .appendingPathComponent(datastreamId)
@@ -123,48 +128,33 @@ actor ConnectedSystemsClient {
         case .scalar(let values):
             let body = try buildScalarObsJSON(values: values, schema: schema)
             try await postRaw(url: url, body: body, contentType: "application/swe+json")
+            return body.count
 
         case .video(let timestamp, let frame):
             let body = buildBinaryObsBody(timestamp: timestamp, frame: frame)
             try await postRaw(url: url, body: body, contentType: "application/swe+binary")
+            return body.count
         }
     }
 
-    // MARK: - Post a batch of observations
+    // MARK: - Why there is no batch POST
     //
-    // POST /datastreams/{datastreamId}/observations  with a JSON *array* body:
-    //   [ {...}, {...}, ... ]
+    // There was one, briefly: it wrapped a flush's worth of records in a JSON
+    // array and sent them as one request. The OSH node rejects that outright —
     //
-    // Each element is the same ordered swe+json object that postObservation()
-    // sends for a single scalar record, so the server's streaming parser reads
-    // them with the identical field ordering. Batching cuts one HTTP round-trip
-    // per sensor sample down to one per flush interval.
+    //   Invalid request (BAD_PAYLOAD): Invalid payload:
+    //   java.lang.IllegalStateException: Expected BEGIN_OBJECT but was BEGIN_ARRAY
     //
-    // Video (.video payloads) is not supported here — frames are posted one at a
-    // time as application/swe+binary via postObservation.
-
-    func postObservations(datastreamId: String,
-                          observations: [Observation],
-                          schema: DataRecord?) async throws {
-        guard !observations.isEmpty else { return }
-
-        var objects: [String] = []
-        objects.reserveCapacity(observations.count)
-        for observation in observations {
-            guard case .scalar(let values) = observation.payload, !values.isEmpty else { continue }
-            objects.append(scalarObsObject(values: values, schema: schema))
-        }
-        guard !objects.isEmpty else { return }
-
-        let body = "[" + objects.joined(separator: ",") + "]"
-        guard let data = body.data(using: .utf8) else { throw ClientError.encodingFailed }
-
-        let url = baseURL
-            .appendingPathComponent("datastreams")
-            .appendingPathComponent(datastreamId)
-            .appendingPathComponent("observations")
-        try await postRaw(url: url, body: data, contentType: "application/swe+json")
-    }
+    // — because the swe+json binding reads exactly one record per request. Worse,
+    // the node forwards that 400 to /sensorhub/error/invalid, which its admin
+    // module denies and redirects, so the client sees an opaque 302 rather than
+    // the parse error. Every scalar observation was lost for as long as the
+    // array path existed.
+    //
+    // ObservationPublisher therefore still batches in *time* — accumulating for
+    // 250 ms so delivery is bounded and the ring buffer and backoff logic have
+    // something to work with — but issues one POST per observation, which is
+    // what the node accepts and what the Android driver does.
 
     // MARK: - JSON builders
     //
@@ -549,11 +539,28 @@ actor ConnectedSystemsClient {
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.setValue(authHeader, forHTTPHeaderField: "Authorization")
 
-        let (_, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw ClientError.invalidResponse
         }
         guard (200...299).contains(http.statusCode) else {
+            // The status code alone is not enough to act on. NoRedirectDelegate
+            // stops URLSession following redirects, and the node answers a 404
+            // with a 302 to its admin error page — so a bare "HTTP 302" hides
+            // whether the resource was missing, the body was rejected, or the
+            // request was bounced to a login page. The Location header and the
+            // body say which, so both are logged here rather than discarded.
+            let location = http.value(forHTTPHeaderField: "Location") ?? "none"
+            let contentTypeIn = http.value(forHTTPHeaderField: "Content-Type") ?? "none"
+            let bodyText = String(data: data.prefix(512), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "<\(data.count) bytes>"
+            Log.api.error("""
+                POST \(url.path, privacy: .public) → HTTP \(http.statusCode) \
+                (sent \(contentType, privacy: .public), \(body.count) bytes) \
+                location=\(location, privacy: .public) \
+                responseType=\(contentTypeIn, privacy: .public) \
+                body=\(bodyText, privacy: .public)
+                """)
             throw ClientError.httpError(http.statusCode)
         }
 
@@ -569,23 +576,6 @@ actor ConnectedSystemsClient {
     private func postRaw(url: URL, body: Data, contentType: String) async throws -> Int {
         let result = try await post(url: url, body: body, contentType: contentType)
         return result.statusCode
-    }
-}
-
-/// MARK: - No-redirect delegate
-
-/// Prevents URLSession from automatically following HTTP redirects.
-/// The OSH server redirects 404 responses to its admin error page, which
-/// then redirects to /sensorhub and returns 401, masking the real status.
-private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        willPerformHTTPRedirection response: HTTPURLResponse,
-        newRequest request: URLRequest,
-        completionHandler: @escaping (URLRequest?) -> Void
-    ) {
-        completionHandler(nil) // Don't follow; return the original response to the caller.
     }
 }
 

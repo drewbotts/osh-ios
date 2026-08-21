@@ -19,6 +19,15 @@ final class AppSettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(systemName, forKey: "osh.systemName") }
     }
 
+    // MARK: - Sensor configuration
+
+    /// Sensor enables, sample rates and video settings. Lives here rather than
+    /// in view state because Settings writes it while Live and Camera read it,
+    /// and a per-view @State copy would let those drift apart.
+    @Published var config: AppConfig {
+        didSet { config.save() }
+    }
+
     // MARK: - Server configs
 
     @Published var serverConfigs: [ServerConfig] = []
@@ -43,6 +52,7 @@ final class AppSettingsStore: ObservableObject {
     // MARK: - Init
 
     init() {
+        self.config = AppConfig.load()
         self.systemName = UserDefaults.standard.string(forKey: "osh.systemName")
             ?? UIDevice.current.name
         self.serverConfigs = store.loadAll()

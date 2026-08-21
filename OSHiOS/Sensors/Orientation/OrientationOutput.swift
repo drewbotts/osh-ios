@@ -39,7 +39,8 @@ import Combine
 //   definition = "http://sensorml.com/ont/swe/property/OrientationEuler"
 //   Fields: time, heading (0..360 deg), pitch (-90..90 deg), roll (-180..180 deg)
 //
-// Update rate: 10 Hz, matching the Android driver.
+// Update rate: configurable in Settings (AppConfig.orientationInterval),
+// defaulting to 10 Hz to match the Android driver.
 
 // MARK: - QuatOrientationOutput
 
@@ -50,12 +51,15 @@ final class QuatOrientationOutput: SensorModule, @unchecked Sendable {
     let outputName = "quat_orientation_data"
     let recordDescription: DataRecord
     let recommendedEncoding: BinaryEncoding
-    let averageSamplingPeriod: Double = 0.1
+    /// Mirrors the coordinator's configured device-motion interval, so the
+    /// datastream advertises the rate the node will actually receive.
+    let averageSamplingPeriod: Double
 
     private let subject = PassthroughSubject<Observation, Never>()
     var publisher: AnyPublisher<Observation, Never> { subject.eraseToAnyPublisher() }
 
-    init(localFrameURI: String) {
+    init(localFrameURI: String, samplingPeriod: Double) {
+        self.averageSamplingPeriod = samplingPeriod
         self.recordDescription = GeoPosHelper.newQuatOrientationRecord(
             name: outputName,
             localFrameURI: localFrameURI
@@ -99,12 +103,14 @@ final class EulerOrientationOutput: SensorModule, @unchecked Sendable {
     let outputName = "euler_orientation_data"
     let recordDescription: DataRecord
     let recommendedEncoding: BinaryEncoding
-    let averageSamplingPeriod: Double = 0.1
+    /// See QuatOrientationOutput — both share the coordinator's interval.
+    let averageSamplingPeriod: Double
 
     private let subject = PassthroughSubject<Observation, Never>()
     var publisher: AnyPublisher<Observation, Never> { subject.eraseToAnyPublisher() }
 
-    init(localFrameURI: String) {
+    init(localFrameURI: String, samplingPeriod: Double) {
+        self.averageSamplingPeriod = samplingPeriod
         self.recordDescription = GeoPosHelper.newEulerOrientationRecord(
             name: outputName,
             localFrameURI: localFrameURI
@@ -165,11 +171,17 @@ final class OrientationOutputCoordinator {
     let quatOutput: QuatOrientationOutput
     let eulerOutput: EulerOrientationOutput
 
+    /// Seconds between device-motion samples, from AppConfig.orientationInterval.
+    let updateInterval: Double
+
     private var isStarted = false
 
-    init(localFrameURI: String) {
-        quatOutput  = QuatOrientationOutput(localFrameURI: localFrameURI)
-        eulerOutput = EulerOrientationOutput(localFrameURI: localFrameURI)
+    init(localFrameURI: String, updateInterval: Double = 0.1) {
+        self.updateInterval = updateInterval
+        quatOutput  = QuatOrientationOutput(localFrameURI: localFrameURI,
+                                            samplingPeriod: updateInterval)
+        eulerOutput = EulerOrientationOutput(localFrameURI: localFrameURI,
+                                             samplingPeriod: updateInterval)
     }
 
     func start() throws {
@@ -178,7 +190,7 @@ final class OrientationOutputCoordinator {
             throw SensorError.unavailable("Device motion not available")
         }
         isStarted = true
-        motionManager.deviceMotionUpdateInterval = 0.1
+        motionManager.deviceMotionUpdateInterval = updateInterval
         // .xTrueNorthZVertical needs an authorized, running CLLocationManager to
         // resolve magnetic declination; without one CoreMotion falls back to
         // magnetic north silently.

@@ -35,6 +35,19 @@ final class GPSOutput: NSObject, SensorModule, @unchecked Sendable {
     private let locationManager: CLLocationManager
     private let localFrameURI: String
 
+    // MARK: Accuracy side channel
+    //
+    // Horizontal accuracy is not part of the SWE record — the Android driver's
+    // Location schema is time + lat/lon/alt and this app must register the same
+    // one — but the map needs it to draw an accuracy circle. It travels beside
+    // the observations rather than inside them.
+
+    private let accuracyRelay = AsyncValueRelay<Double>()
+
+    /// Metres of horizontal accuracy for the most recent fix. Negative values
+    /// (CoreLocation's "invalid") are never published.
+    var accuracyUpdates: AsyncStream<Double> { accuracyRelay.stream() }
+
     // MARK: Init
 
     init(localFrameURI: String) {
@@ -80,12 +93,38 @@ final class GPSOutput: NSObject, SensorModule, @unchecked Sendable {
             locationManager.startUpdatingLocation()
 
         default:
+            enableBackgroundUpdatesIfAuthorized()
             locationManager.startUpdatingLocation()
         }
     }
 
     func stop() {
         locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
+        accuracyRelay.finish()
+    }
+
+    /// Keeps fixes coming while the screen is locked.
+    ///
+    /// Requires the "location" UIBackgroundMode, which the app declares — the
+    /// property traps at runtime without it. When-in-use authorization is
+    /// enough; we deliberately never ask for Always, so background delivery
+    /// lasts only as long as the system's grace period for an app the user
+    /// started streaming from the foreground, and the blue status indicator
+    /// makes that visible.
+    ///
+    /// Camera, motion and audio capture are *not* covered by this: iOS
+    /// suspends AVCaptureSession, CMMotionManager updates and AVAudioEngine
+    /// taps when the app leaves the foreground, by platform policy. Only GPS
+    /// keeps producing observations in the background.
+    private func enableBackgroundUpdatesIfAuthorized() {
+        switch locationManager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            locationManager.allowsBackgroundLocationUpdates = true
+            locationManager.showsBackgroundLocationIndicator = true
+        default:
+            break
+        }
     }
 }
 
@@ -112,6 +151,11 @@ extension GPSOutput: CLLocationManagerDelegate {
             payload: .scalar(scalars)
         )
         subject.send(obs)
+
+        // CoreLocation reports a negative accuracy when it has none to give.
+        if location.horizontalAccuracy >= 0 {
+            accuracyRelay.send(location.horizontalAccuracy)
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -126,6 +170,7 @@ extension GPSOutput: CLLocationManagerDelegate {
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
             Log.sensors.info("Location authorized — starting updates")
+            enableBackgroundUpdatesIfAuthorized()
             manager.startUpdatingLocation()
         case .denied, .restricted:
             Log.sensors.error("Location permission denied — GPS output will produce no data")

@@ -17,9 +17,14 @@ import Network
 //                                   │
 //                     flush every 250 ms, or immediately at 50 records
 //                                   │
-//                     POST /datastreams/{id}/observations  (JSON array)
+//                     one POST /datastreams/{id}/observations per record
 //                                   │
 //                          success ─┴─ failure → ring buffer + backoff probe
+//
+// Batching is in time, not in payload: the node's swe+json binding reads one
+// record per request, so a flush issues one POST per observation. Accumulating
+// still bounds how long a record waits and gives the ring buffer and backoff
+// probe a unit of work to retry.
 //
 // Ring buffer: fixed capacity 1000; oldest items dropped when full (keeping the
 // most-recent data is preferred over unbounded growth or backpressure).
@@ -30,8 +35,18 @@ import Network
 
 actor ObservationPublisher {
 
+    /// Delivery counters for one datastream. `bytes` is request-body bytes, so
+    /// it reflects what actually went over the wire rather than an estimate of
+    /// the values' size.
+    typealias DatastreamCounters = (sent: Int, bytes: Int, errors: Int)
+
     /// Snapshot of publisher health, delivered over `status`.
-    typealias Status = (isConnected: Bool, queuedCount: Int, sentCount: Int, errorCount: Int)
+    /// `perDatastream` is keyed by output name, matching `datastreamIds`.
+    typealias Status = (isConnected: Bool,
+                        queuedCount: Int,
+                        sentCount: Int,
+                        errorCount: Int,
+                        perDatastream: [String: DatastreamCounters])
 
     // MARK: Tunables
 
@@ -47,6 +62,7 @@ actor ObservationPublisher {
     private var isConnected = false
     private var sentCount = 0
     private var errorCount = 0
+    private var perDatastream: [String: DatastreamCounters] = [:]
 
     private var client: ConnectedSystemsClient?
     private var systemId: String?
@@ -160,7 +176,17 @@ actor ObservationPublisher {
         (isConnected: isConnected,
          queuedCount: ringBuffer.count + batches.values.reduce(0) { $0 + $1.count },
          sentCount: sentCount,
-         errorCount: errorCount)
+         errorCount: errorCount,
+         perDatastream: perDatastream)
+    }
+
+    /// Records the outcome of one POST against its datastream's counters.
+    private func record(datastreamName: String, sent: Int, bytes: Int, errors: Int) {
+        var counters = perDatastream[datastreamName] ?? (sent: 0, bytes: 0, errors: 0)
+        counters.sent   += sent
+        counters.bytes  += bytes
+        counters.errors += errors
+        perDatastream[datastreamName] = counters
     }
 
     private func notifyStatus() {
@@ -222,8 +248,9 @@ actor ObservationPublisher {
         await drainBuffer()
     }
 
-    /// POSTs the pending batch for one datastream as a single JSON array.
-    /// On failure the whole batch goes to the ring buffer and recovery kicks in.
+    /// POSTs the pending batch for one datastream, one observation per request.
+    /// Anything left unsent when a transport failure stops the run goes to the
+    /// ring buffer and recovery kicks in.
     private func flush(datastreamName: String) async {
         guard let batch = batches[datastreamName], !batch.isEmpty else { return }
         batches[datastreamName] = []
@@ -236,18 +263,83 @@ actor ObservationPublisher {
             return
         }
 
-        do {
-            try await client.postObservations(datastreamId: datastreamId,
-                                              observations: batch,
-                                              schema: datastreamSchemas[datastreamName])
-            sentCount += batch.count
-        } catch {
-            errorCount += 1
-            Log.api.error("Batch POST failed for \(datastreamName, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            for obs in batch { ringBuffer.push(obs) }
+        let outcome = await send(batch,
+                                 to: datastreamId,
+                                 datastreamName: datastreamName,
+                                 client: client,
+                                 context: "Batch")
+        if outcome.shouldRetry {
+            for obs in outcome.unsent { ringBuffer.push(obs) }
             handleSendFailure()
         }
         notifyStatus()
+    }
+
+    // MARK: Sending
+
+    /// What happened while posting a run of observations.
+    private struct SendOutcome {
+        /// Observations never attempted, because a transport failure stopped the
+        /// run. In their original order.
+        var unsent: [Observation] = []
+        /// True when the failure is worth retrying — a network or server problem
+        /// rather than a request the node will reject just as firmly next time.
+        var shouldRetry = false
+    }
+
+    /// Posts each observation as its own request, which is the only shape the
+    /// node's swe+json binding accepts (see ConnectedSystemsClient).
+    ///
+    /// A rejected *payload* is dropped rather than requeued. Retrying it would
+    /// never succeed, and because the ring buffer preserves order it would sit
+    /// at the front forever and block every observation behind it — which is
+    /// exactly what the JSON-array bug caused: an endless drain/probe loop that
+    /// lost the whole scalar stream while reporting only "HTTP 302".
+    private func send(_ observations: [Observation],
+                      to datastreamId: String,
+                      datastreamName: String,
+                      client: ConnectedSystemsClient,
+                      context: String) async -> SendOutcome {
+        var outcome = SendOutcome()
+
+        for (index, observation) in observations.enumerated() {
+            do {
+                let bytes = try await client.postObservation(
+                    datastreamId: datastreamId,
+                    observation: observation,
+                    schema: datastreamSchemas[datastreamName])
+                sentCount += 1
+                record(datastreamName: datastreamName, sent: 1, bytes: bytes, errors: 0)
+            } catch {
+                errorCount += 1
+                record(datastreamName: datastreamName, sent: 0, bytes: 0, errors: 1)
+
+                if Self.isPermanentRejection(error) {
+                    Log.api.error("\(context, privacy: .public) POST rejected for \(datastreamName, privacy: .public) [ds \(datastreamId, privacy: .public)] — dropping observation: \(error.localizedDescription, privacy: .public)")
+                    continue
+                }
+
+                Log.api.error("\(context, privacy: .public) POST failed for \(datastreamName, privacy: .public) [ds \(datastreamId, privacy: .public)]: \(error.localizedDescription, privacy: .public)")
+                outcome.unsent = Array(observations[index...])
+                outcome.shouldRetry = true
+                return outcome
+            }
+        }
+        return outcome
+    }
+
+    /// True when the node's answer says the request itself is wrong, so resending
+    /// it unchanged cannot help.
+    ///
+    /// 3xx counts: this node answers a bad payload with a redirect to an admin
+    /// error page it then denies, so a redirect here means "rejected", never
+    /// "try again". 401 is excluded because credentials can be corrected in
+    /// Settings mid-session, and 408/429 are explicitly retryable.
+    private static func isPermanentRejection(_ error: Error) -> Bool {
+        guard let clientError = error as? ClientError,
+              case .httpError(let code) = clientError else { return false }
+        if (300...399).contains(code) { return true }
+        return (400...499).contains(code) && code != 401 && code != 408 && code != 429
     }
 
     // MARK: Drain
@@ -269,16 +361,14 @@ actor ObservationPublisher {
 
             for (name, observations) in grouped {
                 guard let client, let datastreamId = datastreamIds[name] else { continue }
-                do {
-                    try await client.postObservations(datastreamId: datastreamId,
-                                                      observations: observations,
-                                                      schema: datastreamSchemas[name])
-                    sentCount += observations.count
-                } catch {
-                    errorCount += 1
-                    Log.api.error("Drain POST failed for \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                    // Put them back at the front so ordering is preserved.
-                    for obs in observations.reversed() { ringBuffer.pushFront(obs) }
+                let outcome = await send(observations,
+                                         to: datastreamId,
+                                         datastreamName: name,
+                                         client: client,
+                                         context: "Drain")
+                if outcome.shouldRetry {
+                    // Put the unsent tail back at the front so ordering is preserved.
+                    for obs in outcome.unsent.reversed() { ringBuffer.pushFront(obs) }
                     handleSendFailure()
                     notifyStatus()
                     return

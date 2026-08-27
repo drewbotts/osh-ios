@@ -5,6 +5,96 @@ than by release, because the app has not shipped a versioned build yet.
 
 ---
 
+## Pass 3a — schema-driven SWE Common decoder
+
+The app can now read a datastream it did not write. A schema fetched from any
+OpenSensorHub node is decoded into a component tree, walked once into a parser
+tree, and fed messages in either `application/swe+json` or
+`application/swe+binary` — the same tree serving both formats, ported from the
+parser architecture in osh-js. Nothing about the write path changed.
+
+Everything here was built against a live node and its captured fixtures. The
+test suite runs from the fixtures alone, with the node unreachable.
+
+### Added
+
+**A complete SWE Common vocabulary.** `SWECategory`, `SWEBoolean`, `SWETime`,
+the four Range types, `SWEDataChoice`, `SWEMatrix`, `SWEGeometry` and `SWEHref`
+join the existing components, along with `AllowedValues`, `AllowedTokens` and
+`NilValue`. Existing types gained `description`, `id`, `optional`, `updatable`,
+constraints and nil values as appended stored properties with defaults, so every
+call site in the encoder still compiles unchanged.
+
+**`SWESchemaDecoder`.** SWE JSON into a `DataComponent` tree, discriminating on
+`"type"` with `JSONSerialization` rather than `Codable` — the containers are
+heterogeneous and polymorphic. Records component ids into an index so an
+`elementCount` `href` or a `#ref` can be resolved, and carries the path into
+every error so a failure on a real node is diagnosable from the Logs tab.
+
+**`SWEParserTree` and the token sources.** The schema is walked once; each
+message is decoded by feeding the tree a `TokenSource`. `JSONTokenSource` reads
+swe+json, om+json and single records by path; `BinaryTokenSource` reads
+swe+binary positionally against the encoding's member table. A `DataArray` is
+walked element by element unless the binary encoding puts a `Block` at the
+array's own path, which is how a video frame is told from a spectrum.
+
+**`DatastreamDecoder`, `ObservationStream`, `TimeSynchronizer`.** A datastream
+facade pairing a schema with its tree; a reconnecting WebSocket subscription
+that decodes on the way in; and a port of OSHConnect-Java's TimeSynchronizer
+that buffers observations from several datastreams and releases them in
+phenomenonTime order.
+
+**`ConnectedSystemsReadClient` gained** `getDatastreamSchema`, `makeDecoder`,
+`fetchObservations` with link-based paging, `listSubsystems` and
+`getSystemLocation`.
+
+**`scripts/capture-fixtures.sh`** surveys a node and captures the fixture tree,
+including binary observations over a standard-library WebSocket client with a
+REST fallback for archive-only datastreams. Seven fixture folders cover every
+distinct schema shape the reference node serves.
+
+**`OSHiOS/SWE/Decode/BINARY_FORMAT.md`** records each swe+binary layout, the
+fixture it was verified against, and — for the DataChoice selector — that it
+could not be verified at all.
+
+### Fixed
+
+**Media types in query strings lost their "+".** `URLComponents` leaves "+"
+literal in a query value, so every `obsFormat=application/swe+json` request
+reached the node as `application/swe json`. Schema fetches answered 400 and
+observation fetches 302'd to an error page that itself 401s, so no failure named
+the cause. This affected the existing read client, not only new code: with it
+fixed, all forty datastreams on the reference node decode.
+
+### Changed
+
+**The Node tab shows a decoded schema tree** instead of a raw JSON dump, with
+the raw document behind a toggle — when a node serves something unexpected, the
+bytes are the only way to see what happened. A "Last 10 observations" section
+renders each observation's leaves as path → value.
+
+**`fetchObservations` takes `latest:`.** The node orders observations ascending,
+so a plain `limit: 10` returns the ten oldest records in the archive.
+
+**`buildBinaryObsBody` is internal rather than private**, so the round-trip
+tests can prove the decoder is its exact inverse. Behaviour is unchanged.
+
+### Notes on the node
+
+Where this pass's spec and the node disagreed, the node won:
+
+- swe+json observations arrive as a bare JSON array, not `{"items": […]}`.
+- A `DataArray`'s binary member is keyed by the element *type's* name, once,
+  rather than once per index.
+- UTF-8 text is spelled `string-utf-8` and is framed as a 2-byte big-endian
+  length then modified UTF-8.
+- A video datastream has no swe+json schema at all; the node answers 400.
+- om+json omits the record's Time field from `result` for some drivers and
+  leaves the instant to the envelope — and on a replayed datastream the two
+  differ by the age of the archive.
+
+---
+
 ## Pass 2 — UI restructure and viewer foundations
 
 The app grew from a single form into six tabs, and the pieces a future data

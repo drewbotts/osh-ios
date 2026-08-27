@@ -120,14 +120,26 @@ OSHiOS/                     the app's engine — no SwiftUI
 │   ├── SystemRegistration          cached system id, scoped per server
 │   └── DatastreamRegistration      cached datastream ids, scoped per server
 ├── Client/                 read side, plus the connection the UI holds
-│   ├── ConnectedSystemsReadClient  listing and fetching, tolerant decoding
+│   ├── ConnectedSystemsReadClient  listing, schemas, decoders, observations
 │   ├── ReadModels                  SystemSummary, DatastreamSummary
+│   ├── ObservationStream           live WebSocket subscription, decoded
+│   ├── TimeSynchronizer            reorders observations across datastreams
 │   ├── NodeConnection              one node: read client + write client
 │   ├── NodeConnectionStore         rebuilds the connection when the server changes
+│   ├── URLComponents+MediaType     percent-encodes "+" in a media-type query
 │   └── NoRedirectDelegate          shared by both clients
 ├── SWE/                    the schema model and everything derived from it
 │   ├── Model/                      DataComponent and friends, FieldPath,
-│   │                               FieldValue, ParsedObservation, Observation
+│   │                               FieldValue, ParsedObservation, Observation,
+│   │                               Constraints, BinaryEncoding
+│   ├── Decode/                     reading a remote node's schemas and data
+│   │   ├── SWESchemaDecoder        SWE JSON → DataComponent tree
+│   │   ├── SWEParserTree           schema walked once into a reader tree
+│   │   ├── TokenSource             the seam: one tree, several wire formats
+│   │   ├── JSONTokenSource         swe+json, om+json, single records
+│   │   ├── BinaryTokenSource       swe+binary, per the encoding's member table
+│   │   ├── DatastreamDecoder       one datastream: schema + tree + decode()
+│   │   └── BINARY_FORMAT.md        the verified byte layouts, and what is not
 │   ├── SchemaWalker                leaf paths; values → ParsedObservation
 │   └── LocationPaths               finds lat/lon/alt inside any Location record
 ├── OGC/                    schema *builders* (kept where the port put them)
@@ -157,6 +169,38 @@ osh-ios/                    the SwiftUI app
     └── Settings/           system name, servers, sensors, rates, behavior
 ```
 
+### Reading a datastream
+
+The decode path is a port of the parser architecture in osh-js: a schema is
+walked **once** into a tree of reader nodes, and each message is decoded by
+feeding that tree a token source that knows how to pull values out of one wire
+format. The same tree serves JSON and binary, which is what keeps a datastream
+rendering identically however it was fetched.
+
+```swift
+let decoder = try await connection.readClient.makeDecoder(datastreamId: id)
+
+// archive
+let page = try await connection.readClient.fetchObservations(
+    datastreamId: id, latest: true, limit: 10, decoder: decoder)
+
+// live
+let stream = ObservationStream(connection: connection,
+                               datastreamId: id,
+                               decoder: decoder)
+stream.start()
+for await event in stream.events { … }
+```
+
+`fetchObservations` takes `latest:` because the node orders observations
+ascending: a plain `limit: 10` returns the ten *oldest* records in the archive,
+which is almost never what a caller asking for recent activity means.
+
+`OSHiOS/SWE/Decode/BINARY_FORMAT.md` records the swe+binary layouts that were
+verified against a live node, which fixture each was verified against, and the
+one — the DataChoice selector — that could not be verified because no node
+message exercising it exists.
+
 ### Two rules worth knowing before changing anything
 
 **The UI is schema-driven.** `SensorCard` chooses its body from
@@ -164,6 +208,14 @@ osh-ios/                    the SwiftUI app
 themselves. There is no `is GPSOutput` anywhere in the view layer. This is not
 style: the planned data viewer renders datastreams read back from a node, which
 have no local class at all, and it will reuse these components unchanged.
+
+**A media type in a query string needs its "+" escaped.** Connected Systems
+passes media types as query values — `?f=application/om+json` — and "+" is a
+legal query character, so `URLComponents` leaves it alone and the servlet
+container decodes it to a space. OpenSensorHub then answers 400 for a schema
+request and 302 for an observations one, redirecting to an error page that
+itself 401s, so nothing in the failure names the cause. Build those URLs with
+`setQueryItemsEncodingPlus`.
 
 **Registration ids are cached per server.** Each OSH node mints its own resource
 ids, so `osh.<serverId>.systemId` and `osh.<serverId>.datastreamId.<output>` are
@@ -191,6 +243,41 @@ The project uses Xcode's file-system-synchronized groups: a `.swift` file added
 anywhere under `OSHiOS/`, `OSHiOSShared/`, `OSHiOSWidgets/`, `osh-ios/` or
 `osh-iosTests/` joins the corresponding target automatically. There is no file
 list to maintain in the project file.
+
+The one exception is `osh-iosTests/Fixtures/`, which is a **folder reference**
+so its directory structure survives into the test bundle — seven folders each
+hold a `schema-json.json`, and a flat copy would collapse them onto one file.
+Each fixture file is also listed as a membership exception so the synchronized
+group does not claim it a second time and fail the build with "Multiple commands
+produce …". `scripts/capture-fixtures.sh` regenerates that list, so adding a
+fixture still needs no hand-editing of the project.
+
+### Test fixtures and the live node
+
+The unit tests run entirely from committed fixtures and never touch a network.
+Tests that do talk to a node are skipped unless `OSH_NODE` is set — and
+`xcodebuild` does not forward the host environment into the simulator, so the
+variable needs a `TEST_RUNNER_` prefix on the way in:
+
+```bash
+TEST_RUNNER_OSH_NODE=http://host:8080/sensorhub/api \
+  xcodebuild -project osh-ios.xcodeproj -scheme osh-ios \
+    -destination 'platform=iOS Simulator,name=iPhone 16' \
+    -only-testing:osh-iosTests test
+```
+
+Recapture the fixtures from a node with:
+
+```bash
+OSH_NODE=http://host:8080/sensorhub/api ./scripts/capture-fixtures.sh survey
+OSH_NODE=http://host:8080/sensorhub/api ./scripts/capture-fixtures.sh capture
+```
+
+`survey` prints the node's systems, datastreams and component types without
+writing anything; `capture` writes `osh-iosTests/Fixtures/` and is idempotent.
+`OSH_TEST_USER` / `OSH_TEST_PASS` are used as Basic credentials when both are
+set and are never written to any file. See `osh-iosTests/Fixtures/README.md` for
+the layout and what each folder covers.
 
 `SWIFT_STRICT_CONCURRENCY = complete` is on for every target. Keep it that way.
 
@@ -233,9 +320,14 @@ arbitrary loads for local addresses; a public node should use HTTPS.
   `MaxKeyFrameInterval = 1` so each observation is independently decodable — the
   node stores frames as discrete observations with no GOP context. The cost is a
   much higher bitrate than a normal GOP structure would need.
-- **Schemas are shown raw.** The Node tab pretty-prints a datastream's schema
-  document; it does not decode it. Nothing in the app can yet render a remote
-  datastream's *observations*.
+- **The decoded schema browser is only reachable for this device's own
+  datastreams.** `DatastreamDetailView` now shows a decoded schema tree and the
+  last ten observations, but the Node tab reaches it only from the datastreams
+  this device registered — the "Browse systems on node" list is still read-only
+  rows with no drill-down. The decoder handles every datastream on the reference
+  node; the navigation to them does not exist yet.
+- **The server form requires a username** even against a node configured for
+  anonymous access, so such a node has to be given throwaway credentials.
 - **Live Activity and camera preview are device-only.** Both are wired up but
   cannot be exercised meaningfully in the simulator.
 - **Six tabs means a "More" tab.** iOS collapses tabs past the fifth on iPhone,

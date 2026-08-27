@@ -102,7 +102,10 @@ final class ObservationStream: Sendable {
         return components.url ?? URL(fileURLWithPath: "/")
     }
 
-    private static let isoFormatter: ISO8601DateFormatter = {
+    /// nonisolated(unsafe) on the same grounds as the other shared formatters:
+    /// formatOptions are set once here and never mutated, and Foundation
+    /// documents string(from:) as thread-safe for concurrent formatting.
+    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter

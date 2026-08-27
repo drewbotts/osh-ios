@@ -1,0 +1,9 @@
+{
+  "source": "websocket",
+  "messageLengths": [
+    254611,
+    254623,
+    254814
+  ],
+  "note": "Captured from the live WebSocket stream; each length is one WebSocket message."
+}

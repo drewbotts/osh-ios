@@ -1,0 +1,144 @@
+{
+  "id": "02d91178rlfg",
+  "name": "Tempest - Tempest Observation",
+  "system@id": "02abbuuhn57g",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/02abbuuhn57g?f=json",
+    "uid": "urn:osh:sensor:weather:tempest:myTempestDevice:replay",
+    "type": "application/geo+json"
+  },
+  "outputName": "tempestOutputObservation",
+  "validTime": [
+    "2026-08-27T01:27:13.95Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-08-27T01:50:39.187Z",
+    "2026-08-27T01:50:39.187Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/SampleTime",
+      "label": "Sample Time",
+      "description": "UTC epoch timestamp of the observation"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/WindSpeed",
+      "label": "Wind Lull",
+      "description": "Minimum 3-second wind speed over the report interval"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/WindSpeed",
+      "label": "Wind Avg",
+      "description": "Average wind speed over the report interval"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/WindSpeed",
+      "label": "Wind Gust",
+      "description": "Maximum 3-second wind speed over the report interval"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/WindDirectionAngle",
+      "label": "Wind Direction",
+      "description": "Wind direction in degrees (0–360)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/SamplingInterval",
+      "label": "Wind Sample Interval",
+      "description": "Number of seconds of wind samples used to generate the avg/lull/gust values"
+    },
+    {
+      "definition": "http://sensorml.com/ont/isa/property/Atmospheric_Pressure",
+      "label": "Station Pressure",
+      "description": "Raw barometric pressure at station elevation"
+    },
+    {
+      "definition": "http://sensorml.com/ont/misb0601/property/Outside_Air_Temperature",
+      "label": "Air Temperature",
+      "description": "Ambient air temperature"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/RelativeHumidity",
+      "label": "Relative Humidity",
+      "description": "Relative humidity"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/Illuminance",
+      "label": "Illuminance",
+      "description": "Brightness in lux"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/UVIndex",
+      "label": "UV Index",
+      "description": "UV index (0–11+)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/SolarRadiation",
+      "label": "Solar Radiation",
+      "description": "Solar radiation in watts per square metre"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/RainfallAccumulation",
+      "label": "Rain Accumulated",
+      "description": "Rain accumulated over the local day"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/PrecipitationType",
+      "label": "Precipitation Type",
+      "description": "Type of precipitation: None, Rain, Hail, or Rain + Hail"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/LightningDistance",
+      "label": "Lightning Strike Avg Distance",
+      "description": "Average distance of lightning strikes over the last 3 hours"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/LightningCount",
+      "label": "Lightning Strike Count",
+      "description": "Number of lightning strikes over the last 3 hours"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/BatteryVoltage",
+      "label": "Battery Voltage",
+      "description": "Device battery voltage"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/SamplingInterval",
+      "label": "Report Interval",
+      "description": "Reporting interval in minutes"
+    }
+  ],
+  "resultType": "record",
+  "formats": [
+    "application/om+json",
+    "application/swe+json",
+    "application/swe+csv",
+    "application/swe+xml",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02d91178rlfg",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02d91178rlfg?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02abbuuhn57g?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02d91178rlfg/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

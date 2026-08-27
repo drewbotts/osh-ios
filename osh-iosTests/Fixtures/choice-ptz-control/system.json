@@ -1,0 +1,46 @@
+{
+  "type": "Feature",
+  "id": "02luf9f2mgag",
+  "geometry": null,
+  "properties": {
+    "uid": "urn:axis:cam:E82725115276",
+    "featureType": "http://www.w3.org/ns/sosa/Sensor",
+    "name": "Axis PTZ",
+    "description": "Axis Video Camera",
+    "validTime": [
+      "2026-08-27T01:19:49.197Z",
+      "now"
+    ]
+  },
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in SensorML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=sml3",
+      "type": "application/sml+json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "datastreams",
+      "title": "List of system datastreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag/datastreams?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "controlstreams",
+      "title": "List of system controlstreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag/controlstreams?f=json",
+      "type": "application/json"
+    }
+  ]
+}

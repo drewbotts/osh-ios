@@ -1,0 +1,30 @@
+{
+  "items": [
+    {
+      "id": "02d91178rlfg1rtfnra0c2p5cj00",
+      "datastream@id": "02d91178rlfg",
+      "phenomenonTime": "2026-08-27T01:50:39.187Z",
+      "resultTime": "2026-08-27T01:50:39.187Z",
+      "result": {
+        "sampleTime": "2026-08-27T01:50:39.187Z",
+        "windLull": 0.0,
+        "windAvg": 0.0,
+        "windGust": 0.0,
+        "windDirection": 0.0,
+        "windSampleInterval": 60,
+        "stationPressure": 988.24,
+        "airTemperature": 24.77,
+        "relativeHumidity": 92.57,
+        "illuminance": 142757.0,
+        "uvIndex": 0.47,
+        "solarRadiation": 1190.0,
+        "rainAccumulated": 0.0,
+        "precipitationType": "None",
+        "lightningStrikeAvgDistance": 10.0,
+        "lightningStrikeCount": 2,
+        "batteryVoltage": 2.135,
+        "reportInterval": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "type": "Feature",
+  "id": "02abbuuhn57g",
+  "geometry": null,
+  "properties": {
+    "uid": "urn:osh:sensor:weather:tempest:myTempestDevice:replay",
+    "featureType": "http://www.w3.org/ns/sosa/Sensor",
+    "name": "Tempest",
+    "validTime": [
+      "2026-08-27T01:27:13.95Z",
+      "now"
+    ]
+  },
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02abbuuhn57g",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in SensorML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02abbuuhn57g?f=sml3",
+      "type": "application/sml+json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02abbuuhn57g?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "datastreams",
+      "title": "List of system datastreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02abbuuhn57g/datastreams?f=json",
+      "type": "application/json"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "type": "Feature",
+  "id": "0c0g",
+  "geometry": null,
+  "properties": {
+    "uid": "urn:osh:sensor:nmea:ais:ShipXplorerDongle",
+    "featureType": "http://www.w3.org/ns/sosa/Sensor",
+    "name": "New NMEA AIS Decoder",
+    "validTime": [
+      "2026-06-17T17:18:52.931Z",
+      "now"
+    ]
+  },
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0c0g",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in SensorML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0c0g?f=sml3",
+      "type": "application/sml+json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0c0g?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "samplingFeatures",
+      "title": "List of system sampling features",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0c0g/samplingFeatures?f=geojson",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "datastreams",
+      "title": "List of system datastreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0c0g/datastreams?f=json",
+      "type": "application/json"
+    }
+  ]
+}

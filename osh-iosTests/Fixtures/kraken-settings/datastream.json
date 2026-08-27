@@ -1,0 +1,166 @@
+{
+  "id": "0g0g",
+  "name": "KrakenSDR - Current Applicable Settings",
+  "system@id": "0g0g",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/0g0g?f=json",
+    "uid": "urn:osh:sensor:krakensdr:kraken002",
+    "type": "application/geo+json"
+  },
+  "outputName": "kraken_settings",
+  "validTime": [
+    "2026-06-23T16:21:44.786Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-06-23T16:24:07.026Z",
+    "2026-06-23T16:25:21.781Z"
+  ],
+  "resultTime": [
+    "2026-06-23T16:24:07.026Z",
+    "2026-06-23T16:25:21.781Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/Time",
+      "label": "OSH Collection Time",
+      "description": "Timestamp of when OSH took a reading of the current settings"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/Frequency",
+      "label": "Center Frequency",
+      "description": "The transmission frequency of the event in MegaHertz"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/UniformGain",
+      "label": "Receiver Gain",
+      "description": "Current reciever gain settings in dB for the KrakenSDR"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/AntennaArrangement",
+      "label": "Antenna Arrangement",
+      "description": "The Arrangement must be UCA or ULA"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/AntennaSpacingMeter",
+      "label": "Antenna Array Radius",
+      "description": "Current spacing of the Antenna Array"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/DoaEnabled",
+      "label": "DoA Estimation Enabled",
+      "description": "Boolean on if DoA Estimation is enabled on kraken software"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/DoaMethod",
+      "label": "DoA Algorithm",
+      "description": "Algorithm used for DoA calculation"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/DoaDecorrelationMethod",
+      "label": "DoA Decorrelation Method",
+      "description": "Decorrelation method used for DoA calculation"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/UlaDirection",
+      "label": "ULA Output Direction",
+      "description": "ULA Output Direction"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/ArrayOffset",
+      "label": "Antenna Array Offset",
+      "description": "Current Offset in degrees"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/ExpectedNumberOfSources",
+      "label": "Expected Number of Sources",
+      "description": "Expected Number of Sources (1-4)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/SpectrumCalculation",
+      "label": "Spectrum Calculation",
+      "description": "Spectrum Calculation"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/VfoMode",
+      "label": "VFO Mode",
+      "description": "VFO Mode"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/VfoDefaultSquelchMode",
+      "label": "VFO Default Squelch Mode",
+      "description": "VFO Default Squelch Mode (Auto, Manual, Auto Channel"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/ActiveVfos",
+      "label": "Active VFO's",
+      "description": "Active VFO's(1-16)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/OutputVfos",
+      "label": "Output VFO's",
+      "description": "Output VFO's(-1 for all, 0-15)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/DspDecimation",
+      "label": "DSP Decimation",
+      "description": "DSP Decimation (≥1)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/optimizeShortBursts",
+      "label": "Optimize Short Bursts",
+      "description": "Optimize Short Bursts"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/StationId",
+      "label": "Station ID",
+      "description": "ID provided for the physical KrakenSDR"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/locationSource",
+      "label": "Location Source",
+      "description": "Current Location Source for the Kraken Station"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/LocationVector"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/Heading",
+      "label": "Heading",
+      "description": "Heading in degrees"
+    }
+  ],
+  "resultType": "record",
+  "formats": [
+    "application/om+json",
+    "application/swe+json",
+    "application/swe+csv",
+    "application/swe+xml",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g0g",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g0g?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0g0g?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g0g/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

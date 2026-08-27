@@ -1,0 +1,61 @@
+{
+  "id": "0k0g",
+  "name": "Android Sensors [Android2-0253] - gps_data",
+  "system@id": "0k0g",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/0k0g?f=json",
+    "uid": "urn:osh:android:7ae57419dd427e4c:droid2",
+    "type": "application/geo+json"
+  },
+  "outputName": "gps_data",
+  "validTime": [
+    "2026-03-18T16:02:58.497Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-03-18T17:05:35.951Z",
+    "2026-03-18T17:08:34Z"
+  ],
+  "resultTime": [
+    "2026-03-18T17:05:35.951Z",
+    "2026-03-18T17:08:34Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/LocationVector"
+    }
+  ],
+  "resultType": "vector",
+  "formats": [
+    "application/om+json",
+    "application/swe+json",
+    "application/swe+csv",
+    "application/swe+xml",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0k0g",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0k0g?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0k0g?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0k0g/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

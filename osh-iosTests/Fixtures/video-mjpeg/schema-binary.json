@@ -1,0 +1,84 @@
+{
+  "obsFormat": "application/swe+binary",
+  "recordSchema": {
+    "type": "DataRecord",
+    "name": "video1",
+    "definition": "http://sensorml.com/ont/swe/property/VideoFrame",
+    "label": "Video",
+    "description": "Video stream via FFmpeg (mjpeg)",
+    "fields": [
+      {
+        "type": "Time",
+        "name": "sampleTime",
+        "definition": "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        "label": "Sample Time",
+        "description": "Time of data collection",
+        "referenceFrame": "http://www.opengis.net/def/trs/BIPM/0/UTC",
+        "uom": {
+          "href": "http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"
+        }
+      },
+      {
+        "type": "DataArray",
+        "name": "img",
+        "definition": "http://sensorml.com/ont/swe/property/RasterImage",
+        "elementCount": {
+          "type": "Count",
+          "name": "elementCount",
+          "definition": "http://sensorml.com/ont/swe/property/GridHeight",
+          "axisID": "Y",
+          "value": 1512
+        },
+        "elementType": {
+          "type": "DataArray",
+          "name": "row",
+          "elementCount": {
+            "type": "Count",
+            "name": "elementCount",
+            "definition": "http://sensorml.com/ont/swe/property/GridWidth",
+            "axisID": "X",
+            "value": 2688
+          },
+          "elementType": {
+            "type": "DataRecord",
+            "name": "pixel",
+            "fields": [
+              {
+                "type": "Count",
+                "name": "red",
+                "definition": "http://sensorml.com/ont/swe/property/RedChannel"
+              },
+              {
+                "type": "Count",
+                "name": "green",
+                "definition": "http://sensorml.com/ont/swe/property/GreenChannel"
+              },
+              {
+                "type": "Count",
+                "name": "blue",
+                "definition": "http://sensorml.com/ont/swe/property/BlueChannel"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "recordEncoding": {
+    "type": "BinaryEncoding",
+    "byteOrder": "bigEndian",
+    "byteEncoding": "raw",
+    "members": [
+      {
+        "type": "Component",
+        "ref": "/sampleTime",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Block",
+        "ref": "/img",
+        "compression": "JPEG"
+      }
+    ]
+  }
+}

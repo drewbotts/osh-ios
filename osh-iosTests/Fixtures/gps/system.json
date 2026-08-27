@@ -1,0 +1,45 @@
+{
+  "type": "Feature",
+  "id": "0k0g",
+  "geometry": null,
+  "properties": {
+    "uid": "urn:osh:android:7ae57419dd427e4c:droid2",
+    "featureType": "http://www.w3.org/ns/sosa/Sensor",
+    "name": "Android Sensors [Android2-0253]",
+    "validTime": [
+      "2026-03-18T16:02:58.497Z",
+      "now"
+    ]
+  },
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0k0g",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in SensorML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0k0g?f=sml3",
+      "type": "application/sml+json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0k0g?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "samplingFeatures",
+      "title": "List of system sampling features",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0k0g/samplingFeatures?f=geojson",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "datastreams",
+      "title": "List of system datastreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0k0g/datastreams?f=json",
+      "type": "application/json"
+    }
+  ]
+}

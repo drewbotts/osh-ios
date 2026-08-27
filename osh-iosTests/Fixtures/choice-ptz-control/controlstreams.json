@@ -1,0 +1,74 @@
+{
+  "items": [
+    {
+      "id": "025svjetu8qg",
+      "name": "Axis PTZ - ptzControl",
+      "system@id": "02luf9f2mgag",
+      "system@link": {
+        "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=json",
+        "uid": "urn:axis:cam:E82725115276",
+        "type": "application/geo+json"
+      },
+      "inputName": "ptzControl",
+      "validTime": [
+        "2026-08-27T01:19:49.197Z",
+        "now"
+      ],
+      "controlledProperties": [
+        {
+          "definition": "http://sensorml.com/ont/swe/property/Pan",
+          "label": "Pan",
+          "description": "Gimbal rotation (usually horizontal)"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/Tilt",
+          "label": "Tilt",
+          "description": "Gimbal rotation (usually up-down)"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/ZoomFactor",
+          "label": "Zoom Factor",
+          "description": "Camera specific zoom factor"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/RelativePan",
+          "label": "Relative Pan"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/RelativeTilt",
+          "label": "Relative Tilt"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/RelativeZoomFactor",
+          "label": "Relative Zoom Factor"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/CameraPresetPositionName",
+          "label": "Preset Camera Position"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/Pan",
+          "label": "Pan",
+          "description": "Gimbal rotation (usually horizontal)"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/Tilt",
+          "label": "Tilt",
+          "description": "Gimbal rotation (usually up-down)"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/ZoomFactor",
+          "label": "Zoom Factor",
+          "description": "Camera specific zoom factor"
+        }
+      ],
+      "formats": [
+        "application/json",
+        "application/swe+json",
+        "application/swe+csv",
+        "application/swe+xml",
+        "application/swe+binary"
+      ]
+    }
+  ]
+}

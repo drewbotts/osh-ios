@@ -55,6 +55,64 @@
 		3A38D7A12F74157D00D8BF3F /* osh-iosUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "osh-iosUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3A0OSHFIX00000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Fixtures/ais-vessel-location/datastream.json,
+				Fixtures/ais-vessel-location/obs-binary.bin,
+				Fixtures/ais-vessel-location/obs-binary.index.json,
+				Fixtures/ais-vessel-location/obs-json.json,
+				Fixtures/ais-vessel-location/obs-omjson.json,
+				Fixtures/ais-vessel-location/schema-binary.json,
+				Fixtures/ais-vessel-location/schema-json.json,
+				Fixtures/ais-vessel-location/system.json,
+				Fixtures/choice-ptz-control/control-schema.json,
+				Fixtures/choice-ptz-control/controlstreams.json,
+				Fixtures/choice-ptz-control/system.json,
+				Fixtures/gps/datastream.json,
+				Fixtures/gps/obs-binary.bin,
+				Fixtures/gps/obs-binary.index.json,
+				Fixtures/gps/obs-json.json,
+				Fixtures/gps/obs-omjson.json,
+				Fixtures/gps/schema-binary.json,
+				Fixtures/gps/schema-json.json,
+				Fixtures/gps/system.json,
+				Fixtures/kraken-settings/datastream.json,
+				Fixtures/kraken-settings/obs-binary.bin,
+				Fixtures/kraken-settings/obs-binary.index.json,
+				Fixtures/kraken-settings/obs-json.json,
+				Fixtures/kraken-settings/obs-omjson.json,
+				Fixtures/kraken-settings/schema-binary.json,
+				Fixtures/kraken-settings/schema-json.json,
+				Fixtures/kraken-settings/system.json,
+				Fixtures/spectrum-array/datastream.json,
+				Fixtures/spectrum-array/obs-binary.bin,
+				Fixtures/spectrum-array/obs-binary.index.json,
+				Fixtures/spectrum-array/obs-json.json,
+				Fixtures/spectrum-array/obs-omjson.json,
+				Fixtures/spectrum-array/schema-binary.json,
+				Fixtures/spectrum-array/schema-json.json,
+				Fixtures/spectrum-array/system.json,
+				Fixtures/video-mjpeg/datastream.json,
+				Fixtures/video-mjpeg/obs-binary.bin,
+				Fixtures/video-mjpeg/obs-binary.index.json,
+				Fixtures/video-mjpeg/obs-omjson.json,
+				Fixtures/video-mjpeg/schema-binary.json,
+				Fixtures/video-mjpeg/system.json,
+				Fixtures/weather/datastream.json,
+				Fixtures/weather/obs-binary.bin,
+				Fixtures/weather/obs-binary.index.json,
+				Fixtures/weather/obs-json.json,
+				Fixtures/weather/obs-omjson.json,
+				Fixtures/weather/schema-binary.json,
+				Fixtures/weather/schema-json.json,
+				Fixtures/weather/system.json,
+			);
+			target = 3A38D7962F74157D00D8BF3F /* osh-iosTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3A0OSH0001000000000000001 /* OSHiOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -78,6 +136,9 @@
 		};
 		3A38D79A2F74157D00D8BF3F /* osh-iosTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3A0OSHFIX00000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
 			path = "osh-iosTests";
 			sourceTree = "<group>";
 		};

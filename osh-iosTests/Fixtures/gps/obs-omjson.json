@@ -1,0 +1,41 @@
+{
+  "items": [
+    {
+      "id": "0k0tvdnbpk33hboro0",
+      "datastream@id": "0k0g",
+      "foi@id": "0k0g",
+      "phenomenonTime": "2026-03-18T17:05:35.951Z",
+      "resultTime": "2026-03-18T17:05:35.951Z",
+      "result": {
+        "location": {"lat": 31.2025068,"lon": -89.18142746,"alt": 58.38763427734375}
+      }
+    },
+    {
+      "id": "0k0u3dnbpk30000000",
+      "datastream@id": "0k0g",
+      "foi@id": "0k0g",
+      "phenomenonTime": "2026-03-18T17:05:37Z",
+      "resultTime": "2026-03-18T17:05:37Z",
+      "result": {
+        "location": {"lat": 31.20250679,"lon": -89.18142747,"alt": 58.3876953125}
+      }
+    },
+    {
+      "id": "0k0u5dnbpk30000000",
+      "datastream@id": "0k0g",
+      "foi@id": "0k0g",
+      "phenomenonTime": "2026-03-18T17:05:38Z",
+      "resultTime": "2026-03-18T17:05:38Z",
+      "result": {
+        "location": {"lat": 31.20250682,"lon": -89.1814275,"alt": 58.3927001953125}
+      }
+    }
+  ],
+  "links": [
+    {
+      "rel": "next",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0k0g/observations?limit=3&offset=3&f=application%2Fom%2Bjson",
+      "type": "application/om+json"
+    }
+  ]
+}

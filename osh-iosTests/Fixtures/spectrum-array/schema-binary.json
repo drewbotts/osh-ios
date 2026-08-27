@@ -1,0 +1,121 @@
+{
+  "obsFormat": "application/swe+binary",
+  "recordSchema": {
+    "type": "DataRecord",
+    "name": "kraken_spectrum",
+    "definition": "http://sensorml.com/ont/swe/property/spectrumOutput",
+    "label": "Spectrum",
+    "description": "RF spectrum data from the KrakenSDR — one frame per active channel",
+    "fields": [
+      {
+        "type": "Time",
+        "name": "time",
+        "definition": "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        "label": "KrakenSDR Collection Time",
+        "description": "Timestamp of when the spectrum frame was generated",
+        "referenceFrame": "http://www.opengis.net/def/trs/BIPM/0/UTC",
+        "uom": {
+          "href": "http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"
+        }
+      },
+      {
+        "type": "Text",
+        "name": "channel",
+        "definition": "http://sensorml.com/ont/swe/property/ChannelIdentifier",
+        "label": "Active Channel",
+        "description": "Antenna channel carrying valid spectrum data (e.g. ch0)"
+      },
+      {
+        "type": "Count",
+        "name": "freq_count",
+        "definition": "http://sensorml.com/ont/swe/property/NumberOfFrequencyPoints",
+        "id": "KRAKEN_FREQ_COUNT",
+        "label": "Frequency Axis Size",
+        "description": "Number of points in the frequency_axis array"
+      },
+      {
+        "type": "DataArray",
+        "name": "frequency_axis",
+        "definition": "http://qudt.org/vocab/quantitykind/Frequency",
+        "label": "Frequency Axis",
+        "description": "Center frequency of each sample point in Hz",
+        "elementCount": {
+          "href": "#KRAKEN_FREQ_COUNT"
+        },
+        "elementType": {
+          "type": "Quantity",
+          "name": "frequency",
+          "definition": "http://qudt.org/vocab/quantitykind/Frequency",
+          "label": "Frequency",
+          "uom": {
+            "code": "Hz"
+          }
+        }
+      },
+      {
+        "type": "Count",
+        "name": "amp_count",
+        "definition": "http://sensorml.com/ont/swe/property/NumberOfAmplitudePoints",
+        "id": "KRAKEN_AMP_COUNT",
+        "label": "Amplitude Array Size",
+        "description": "Number of points in the amplitude array (equals freq_count)"
+      },
+      {
+        "type": "DataArray",
+        "name": "amplitude",
+        "definition": "http://sensorml.com/ont/swe/property/SignalAmplitude",
+        "label": "Amplitude",
+        "description": "Signal amplitude at each frequency point in dBFS",
+        "elementCount": {
+          "href": "#KRAKEN_AMP_COUNT"
+        },
+        "elementType": {
+          "type": "Quantity",
+          "name": "amplitude",
+          "definition": "http://sensorml.com/ont/swe/property/SignalAmplitude",
+          "label": "Amplitude",
+          "uom": {
+            "code": "dB"
+          }
+        }
+      }
+    ]
+  },
+  "recordEncoding": {
+    "type": "BinaryEncoding",
+    "byteOrder": "bigEndian",
+    "byteEncoding": "raw",
+    "members": [
+      {
+        "type": "Component",
+        "ref": "/time",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/channel",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/string-utf-8"
+      },
+      {
+        "type": "Component",
+        "ref": "/freq_count",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/signedInt"
+      },
+      {
+        "type": "Component",
+        "ref": "/frequency_axis/frequency",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/float32"
+      },
+      {
+        "type": "Component",
+        "ref": "/amp_count",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/signedInt"
+      },
+      {
+        "type": "Component",
+        "ref": "/amplitude/amplitude",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/float32"
+      }
+    ]
+  }
+}

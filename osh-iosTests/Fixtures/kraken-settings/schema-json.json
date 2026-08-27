@@ -1,0 +1,254 @@
+{
+  "obsFormat": "application/swe+json",
+  "recordSchema": {
+    "type": "DataRecord",
+    "name": "kraken_settings",
+    "definition": "http://sensorml.com/ont/swe/property/krakenSettingsOutput",
+    "label": "Current Applicable Settings",
+    "description": "This is the output for the krakenSDR's current settings",
+    "fields": [
+      {
+        "type": "Time",
+        "name": "time",
+        "definition": "http://sensorml.com/ont/swe/property/Time",
+        "label": "OSH Collection Time",
+        "description": "Timestamp of when OSH took a reading of the current settings",
+        "referenceFrame": "http://www.opengis.net/def/trs/BIPM/0/UTC",
+        "uom": {
+          "href": "http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"
+        }
+      },
+      {
+        "type": "DataRecord",
+        "name": "receiverConfigSettings",
+        "definition": "http://sensorml.com/ont/swe/property/ReceiverConfigSettings",
+        "label": "RF Receiver Configuration",
+        "description": "Data Record for the RF Receiver Configuration",
+        "fields": [
+          {
+            "type": "Quantity",
+            "name": "centerFreq",
+            "definition": "http://sensorml.com/ont/swe/property/Frequency",
+            "label": "Center Frequency",
+            "description": "The transmission frequency of the event in MegaHertz",
+            "uom": {
+              "code": "MHz"
+            }
+          },
+          {
+            "type": "Quantity",
+            "name": "uniformGain",
+            "definition": "http://sensorml.com/ont/swe/property/UniformGain",
+            "label": "Receiver Gain",
+            "description": "Current reciever gain settings in dB for the KrakenSDR",
+            "uom": {
+              "code": "dB"
+            }
+          }
+        ]
+      },
+      {
+        "type": "DataRecord",
+        "name": "doaConfig",
+        "definition": "http://sensorml.com/ont/swe/property/DoaConfig",
+        "label": "DoA Configuration",
+        "description": "Data Record for the DoA Configuration Settings",
+        "fields": [
+          {
+            "type": "Text",
+            "name": "antennaArrangement",
+            "definition": "http://sensorml.com/ont/swe/property/AntennaArrangement",
+            "label": "Antenna Arrangement",
+            "description": "The Arrangement must be UCA or ULA"
+          },
+          {
+            "type": "Quantity",
+            "name": "antennaSpacingMeter",
+            "definition": "http://sensorml.com/ont/swe/property/AntennaSpacingMeter",
+            "label": "Antenna Array Radius",
+            "description": "Current spacing of the Antenna Array",
+            "uom": {
+              "code": "m"
+            }
+          },
+          {
+            "type": "Boolean",
+            "name": "doaEnabled",
+            "definition": "http://sensorml.com/ont/swe/property/DoaEnabled",
+            "label": "DoA Estimation Enabled",
+            "description": "Boolean on if DoA Estimation is enabled on kraken software"
+          },
+          {
+            "type": "Text",
+            "name": "doaMethod",
+            "definition": "http://sensorml.com/ont/swe/property/DoaMethod",
+            "label": "DoA Algorithm",
+            "description": "Algorithm used for DoA calculation"
+          },
+          {
+            "type": "Text",
+            "name": "doaDecorrelationMethod",
+            "definition": "http://sensorml.com/ont/swe/property/DoaDecorrelationMethod",
+            "label": "DoA Decorrelation Method",
+            "description": "Decorrelation method used for DoA calculation"
+          },
+          {
+            "type": "Text",
+            "name": "ulaDirection",
+            "definition": "http://sensorml.com/ont/swe/property/UlaDirection",
+            "label": "ULA Output Direction",
+            "description": "ULA Output Direction"
+          },
+          {
+            "type": "Quantity",
+            "name": "arrayOffset",
+            "definition": "http://sensorml.com/ont/swe/property/ArrayOffset",
+            "label": "Antenna Array Offset",
+            "description": "Current Offset in degrees",
+            "uom": {
+              "code": "deg"
+            }
+          },
+          {
+            "type": "Quantity",
+            "name": "expectedNumOfSources",
+            "definition": "http://sensorml.com/ont/swe/property/ExpectedNumberOfSources",
+            "label": "Expected Number of Sources",
+            "description": "Expected Number of Sources (1-4)",
+            "uom": {
+              "href": "http://qudt.org/vocab/unit/UNITLESS"
+            }
+          }
+        ]
+      },
+      {
+        "type": "DataRecord",
+        "name": "vfoConfigSettings",
+        "definition": "http://sensorml.com/ont/swe/property/VfoConfigSettings",
+        "label": "VFO Configuration Settings",
+        "description": "Data Record for the Variable Frequency Oscillator Configuration Settings",
+        "fields": [
+          {
+            "type": "Text",
+            "name": "spectrumCalculation",
+            "definition": "http://sensorml.com/ont/swe/property/SpectrumCalculation",
+            "label": "Spectrum Calculation",
+            "description": "Spectrum Calculation"
+          },
+          {
+            "type": "Text",
+            "name": "vfoMode",
+            "definition": "http://sensorml.com/ont/swe/property/VfoMode",
+            "label": "VFO Mode",
+            "description": "VFO Mode"
+          },
+          {
+            "type": "Text",
+            "name": "vfoDefaultSquelchMode",
+            "definition": "http://sensorml.com/ont/swe/property/VfoDefaultSquelchMode",
+            "label": "VFO Default Squelch Mode",
+            "description": "VFO Default Squelch Mode (Auto, Manual, Auto Channel"
+          },
+          {
+            "type": "Quantity",
+            "name": "activeVfos",
+            "definition": "http://sensorml.com/ont/swe/property/ActiveVfos",
+            "label": "Active VFO's",
+            "description": "Active VFO's(1-16)",
+            "uom": {
+              "href": "http://qudt.org/vocab/unit/UNITLESS"
+            }
+          },
+          {
+            "type": "Quantity",
+            "name": "outputVfos",
+            "definition": "http://sensorml.com/ont/swe/property/OutputVfos",
+            "label": "Output VFO's",
+            "description": "Output VFO's(-1 for all, 0-15)",
+            "uom": {
+              "href": "http://qudt.org/vocab/unit/UNITLESS"
+            }
+          },
+          {
+            "type": "Quantity",
+            "name": "dspDecimation",
+            "definition": "http://sensorml.com/ont/swe/property/DspDecimation",
+            "label": "DSP Decimation",
+            "description": "DSP Decimation (≥1)",
+            "uom": {
+              "href": "http://qudt.org/vocab/unit/UNITLESS"
+            }
+          },
+          {
+            "type": "Boolean",
+            "name": "optimizeShortBursts",
+            "definition": "http://sensorml.com/ont/swe/property/optimizeShortBursts",
+            "label": "Optimize Short Bursts",
+            "description": "Optimize Short Bursts"
+          }
+        ]
+      },
+      {
+        "type": "DataRecord",
+        "name": "stationConfig",
+        "definition": "http://sensorml.com/ont/swe/property/StationConfig",
+        "label": "Station Configuration",
+        "description": "Data Record for the Station Configuration",
+        "fields": [
+          {
+            "type": "Text",
+            "name": "stationId",
+            "definition": "http://sensorml.com/ont/swe/property/StationId",
+            "label": "Station ID",
+            "description": "ID provided for the physical KrakenSDR"
+          },
+          {
+            "type": "Text",
+            "name": "locationSource",
+            "definition": "http://sensorml.com/ont/swe/property/locationSource",
+            "label": "Location Source",
+            "description": "Current Location Source for the Kraken Station"
+          },
+          {
+            "type": "Vector",
+            "name": "location",
+            "definition": "http://sensorml.com/ont/swe/property/LocationVector",
+            "referenceFrame": "http://www.opengis.net/def/crs/EPSG/0/4326",
+            "coordinates": [
+              {
+                "type": "Quantity",
+                "name": "lat",
+                "definition": "http://sensorml.com/ont/swe/property/GeodeticLatitude",
+                "label": "Geodetic Latitude",
+                "axisID": "Lat",
+                "uom": {
+                  "code": "deg"
+                }
+              },
+              {
+                "type": "Quantity",
+                "name": "lon",
+                "definition": "http://sensorml.com/ont/swe/property/Longitude",
+                "label": "Longitude",
+                "axisID": "Lon",
+                "uom": {
+                  "code": "deg"
+                }
+              }
+            ]
+          },
+          {
+            "type": "Quantity",
+            "name": "heading",
+            "definition": "http://sensorml.com/ont/swe/property/Heading",
+            "label": "Heading",
+            "description": "Heading in degrees",
+            "uom": {
+              "code": "deg"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

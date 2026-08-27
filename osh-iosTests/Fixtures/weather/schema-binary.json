@@ -1,0 +1,278 @@
+{
+  "obsFormat": "application/swe+binary",
+  "recordSchema": {
+    "type": "DataRecord",
+    "name": "tempestOutputObservation",
+    "definition": "http://sensorml.com/ont/swe/property/TempestOutputObservation",
+    "label": "Tempest Observation",
+    "description": "Unified weather observation from the Tempest Weather Station (obs_st)",
+    "fields": [
+      {
+        "type": "Time",
+        "name": "sampleTime",
+        "definition": "http://sensorml.com/ont/swe/property/SampleTime",
+        "label": "Sample Time",
+        "description": "UTC epoch timestamp of the observation",
+        "referenceFrame": "http://www.opengis.net/def/trs/BIPM/0/UTC",
+        "uom": {
+          "href": "http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "windLull",
+        "definition": "http://sensorml.com/ont/swe/property/WindSpeed",
+        "label": "Wind Lull",
+        "description": "Minimum 3-second wind speed over the report interval",
+        "uom": {
+          "code": "m/s"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "windAvg",
+        "definition": "http://sensorml.com/ont/swe/property/WindSpeed",
+        "label": "Wind Avg",
+        "description": "Average wind speed over the report interval",
+        "uom": {
+          "code": "m/s"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "windGust",
+        "definition": "http://sensorml.com/ont/swe/property/WindSpeed",
+        "label": "Wind Gust",
+        "description": "Maximum 3-second wind speed over the report interval",
+        "uom": {
+          "code": "m/s"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "windDirection",
+        "definition": "http://sensorml.com/ont/swe/property/WindDirectionAngle",
+        "label": "Wind Direction",
+        "description": "Wind direction in degrees (0–360)",
+        "uom": {
+          "code": "deg"
+        }
+      },
+      {
+        "type": "Count",
+        "name": "windSampleInterval",
+        "definition": "http://sensorml.com/ont/swe/property/SamplingInterval",
+        "label": "Wind Sample Interval",
+        "description": "Number of seconds of wind samples used to generate the avg/lull/gust values"
+      },
+      {
+        "type": "Quantity",
+        "name": "stationPressure",
+        "definition": "http://sensorml.com/ont/isa/property/Atmospheric_Pressure",
+        "label": "Station Pressure",
+        "description": "Raw barometric pressure at station elevation",
+        "uom": {
+          "code": "mbar"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "airTemperature",
+        "definition": "http://sensorml.com/ont/misb0601/property/Outside_Air_Temperature",
+        "label": "Air Temperature",
+        "description": "Ambient air temperature",
+        "uom": {
+          "code": "Cel"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "relativeHumidity",
+        "definition": "http://sensorml.com/ont/swe/property/RelativeHumidity",
+        "label": "Relative Humidity",
+        "description": "Relative humidity",
+        "uom": {
+          "code": "%"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "illuminance",
+        "definition": "http://sensorml.com/ont/swe/property/Illuminance",
+        "label": "Illuminance",
+        "description": "Brightness in lux",
+        "uom": {
+          "code": "lx"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "uvIndex",
+        "definition": "http://sensorml.com/ont/swe/property/UVIndex",
+        "label": "UV Index",
+        "description": "UV index (0–11+)",
+        "uom": {
+          "code": "1"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "solarRadiation",
+        "definition": "http://sensorml.com/ont/swe/property/SolarRadiation",
+        "label": "Solar Radiation",
+        "description": "Solar radiation in watts per square metre",
+        "uom": {
+          "code": "W/m2"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "rainAccumulated",
+        "definition": "http://sensorml.com/ont/swe/property/RainfallAccumulation",
+        "label": "Rain Accumulated",
+        "description": "Rain accumulated over the local day",
+        "uom": {
+          "code": "mm"
+        }
+      },
+      {
+        "type": "Text",
+        "name": "precipitationType",
+        "definition": "http://sensorml.com/ont/swe/property/PrecipitationType",
+        "label": "Precipitation Type",
+        "description": "Type of precipitation: None, Rain, Hail, or Rain + Hail"
+      },
+      {
+        "type": "Quantity",
+        "name": "lightningStrikeAvgDistance",
+        "definition": "http://sensorml.com/ont/swe/property/LightningDistance",
+        "label": "Lightning Strike Avg Distance",
+        "description": "Average distance of lightning strikes over the last 3 hours",
+        "uom": {
+          "code": "km"
+        }
+      },
+      {
+        "type": "Count",
+        "name": "lightningStrikeCount",
+        "definition": "http://sensorml.com/ont/swe/property/LightningCount",
+        "label": "Lightning Strike Count",
+        "description": "Number of lightning strikes over the last 3 hours"
+      },
+      {
+        "type": "Quantity",
+        "name": "batteryVoltage",
+        "definition": "http://sensorml.com/ont/swe/property/BatteryVoltage",
+        "label": "Battery Voltage",
+        "description": "Device battery voltage",
+        "uom": {
+          "code": "V"
+        }
+      },
+      {
+        "type": "Count",
+        "name": "reportInterval",
+        "definition": "http://sensorml.com/ont/swe/property/SamplingInterval",
+        "label": "Report Interval",
+        "description": "Reporting interval in minutes"
+      }
+    ]
+  },
+  "recordEncoding": {
+    "type": "BinaryEncoding",
+    "byteOrder": "bigEndian",
+    "byteEncoding": "raw",
+    "members": [
+      {
+        "type": "Component",
+        "ref": "/sampleTime",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/windLull",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/windAvg",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/windGust",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/windDirection",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/windSampleInterval",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/signedInt"
+      },
+      {
+        "type": "Component",
+        "ref": "/stationPressure",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/airTemperature",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/relativeHumidity",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/illuminance",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/uvIndex",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/solarRadiation",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/rainAccumulated",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/precipitationType",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/string-utf-8"
+      },
+      {
+        "type": "Component",
+        "ref": "/lightningStrikeAvgDistance",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/lightningStrikeCount",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/signedInt"
+      },
+      {
+        "type": "Component",
+        "ref": "/batteryVoltage",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/reportInterval",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/signedInt"
+      }
+    ]
+  }
+}

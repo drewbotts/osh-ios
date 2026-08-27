@@ -1,0 +1,63 @@
+{
+  "id": "02jr71ulsgig",
+  "name": "Axis PTZ - Video",
+  "system@id": "02luf9f2mgag",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=json",
+    "uid": "urn:axis:cam:E82725115276",
+    "type": "application/geo+json"
+  },
+  "outputName": "video1",
+  "validTime": [
+    "2026-08-27T01:19:49.197Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-08-27T01:51:42.851Z",
+    "2026-08-27T01:51:42.851Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/RasterImage"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/RedChannel"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/GreenChannel"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/BlueChannel"
+    }
+  ],
+  "resultType": "coverage",
+  "formats": [
+    "application/om+json",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02jr71ulsgig",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02jr71ulsgig?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02jr71ulsgig/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

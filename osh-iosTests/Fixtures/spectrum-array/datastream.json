@@ -1,0 +1,91 @@
+{
+  "id": "0g1g",
+  "name": "KrakenSDR - Spectrum",
+  "system@id": "0g0g",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/0g0g?f=json",
+    "uid": "urn:osh:sensor:krakensdr:kraken002",
+    "type": "application/geo+json"
+  },
+  "outputName": "kraken_spectrum",
+  "validTime": [
+    "2026-06-23T16:21:44.786Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-06-23T16:23:42.699Z",
+    "2026-06-23T16:25:51.595Z"
+  ],
+  "resultTime": [
+    "2026-06-23T16:23:42.699Z",
+    "2026-06-23T16:25:51.595Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/ChannelIdentifier",
+      "label": "Active Channel",
+      "description": "Antenna channel carrying valid spectrum data (e.g. ch0)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/NumberOfFrequencyPoints",
+      "label": "Frequency Axis Size",
+      "description": "Number of points in the frequency_axis array"
+    },
+    {
+      "definition": "http://qudt.org/vocab/quantitykind/Frequency",
+      "label": "Frequency Axis",
+      "description": "Center frequency of each sample point in Hz"
+    },
+    {
+      "definition": "http://qudt.org/vocab/quantitykind/Frequency",
+      "label": "Frequency"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/NumberOfAmplitudePoints",
+      "label": "Amplitude Array Size",
+      "description": "Number of points in the amplitude array (equals freq_count)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/SignalAmplitude",
+      "label": "Amplitude",
+      "description": "Signal amplitude at each frequency point in dBFS"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/SignalAmplitude",
+      "label": "Amplitude"
+    }
+  ],
+  "resultType": "coverage",
+  "formats": [
+    "application/om+json",
+    "application/swe+json",
+    "application/swe+csv",
+    "application/swe+xml",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g1g",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g1g?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0g0g?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g1g/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

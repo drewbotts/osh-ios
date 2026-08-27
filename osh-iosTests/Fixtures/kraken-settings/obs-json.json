@@ -1,0 +1,98 @@
+[
+  {
+    "time": "2026-08-27T01:50:57.049Z",
+    "receiverConfigSettings": {
+      "centerFreq": 162.5,
+      "uniformGain": 20.7
+    },
+    "doaConfig": {
+      "antennaArrangement": "UCA",
+      "antennaSpacingMeter": 0.21,
+      "doaEnabled": true,
+      "doaMethod": "MUSIC",
+      "doaDecorrelationMethod": "Off",
+      "ulaDirection": "Both",
+      "arrayOffset": 0.0,
+      "expectedNumOfSources": 1.0
+    },
+    "vfoConfigSettings": {
+      "spectrumCalculation": "Single",
+      "vfoMode": "Auto",
+      "vfoDefaultSquelchMode": "Auto",
+      "activeVfos": 1.0,
+      "outputVfos": -1.0,
+      "dspDecimation": 1.0,
+      "optimizeShortBursts": false
+    },
+    "stationConfig": {
+      "stationId": "kraken001",
+      "locationSource": "Static",
+      "location": {"lat": 20.0,"lon": 80.0},
+      "heading": 80.0
+    }
+  },
+  {
+    "time": "2026-08-27T01:50:58.049Z",
+    "receiverConfigSettings": {
+      "centerFreq": 162.5,
+      "uniformGain": 20.7
+    },
+    "doaConfig": {
+      "antennaArrangement": "UCA",
+      "antennaSpacingMeter": 0.21,
+      "doaEnabled": true,
+      "doaMethod": "MUSIC",
+      "doaDecorrelationMethod": "Off",
+      "ulaDirection": "Both",
+      "arrayOffset": 0.0,
+      "expectedNumOfSources": 1.0
+    },
+    "vfoConfigSettings": {
+      "spectrumCalculation": "Single",
+      "vfoMode": "Auto",
+      "vfoDefaultSquelchMode": "Auto",
+      "activeVfos": 1.0,
+      "outputVfos": -1.0,
+      "dspDecimation": 1.0,
+      "optimizeShortBursts": false
+    },
+    "stationConfig": {
+      "stationId": "kraken001",
+      "locationSource": "Static",
+      "location": {"lat": 20.0,"lon": 80.0},
+      "heading": 80.0
+    }
+  },
+  {
+    "time": "2026-08-27T01:50:59.049Z",
+    "receiverConfigSettings": {
+      "centerFreq": 162.5,
+      "uniformGain": 20.7
+    },
+    "doaConfig": {
+      "antennaArrangement": "UCA",
+      "antennaSpacingMeter": 0.21,
+      "doaEnabled": true,
+      "doaMethod": "MUSIC",
+      "doaDecorrelationMethod": "Off",
+      "ulaDirection": "Both",
+      "arrayOffset": 0.0,
+      "expectedNumOfSources": 1.0
+    },
+    "vfoConfigSettings": {
+      "spectrumCalculation": "Single",
+      "vfoMode": "Auto",
+      "vfoDefaultSquelchMode": "Auto",
+      "activeVfos": 1.0,
+      "outputVfos": -1.0,
+      "dspDecimation": 1.0,
+      "optimizeShortBursts": false
+    },
+    "stationConfig": {
+      "stationId": "kraken001",
+      "locationSource": "Static",
+      "location": {"lat": 20.0,"lon": 80.0},
+      "heading": 80.0
+    }
+  }
+]

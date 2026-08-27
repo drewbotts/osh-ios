@@ -1,0 +1,9 @@
+{
+  "source": "rest",
+  "messageLengths": [
+    257,
+    257,
+    257
+  ],
+  "note": "Captured from REST (GET observations?f=application/swe+binary) because the WebSocket stream produced nothing within the timeout \u2014 an archive-only datastream. Lengths were recovered by differencing successive limit=N responses."
+}

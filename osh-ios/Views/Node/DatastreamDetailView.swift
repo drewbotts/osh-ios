@@ -194,13 +194,11 @@ struct DatastreamDetailView: View {
 
         do {
             let decoder = try await connection.readClient.makeDecoder(datastreamId: datastream.id)
-            let page = try await connection.readClient.fetchObservations(
-                datastreamId: datastream.id,
-                latest: true,
-                limit: 10,
-                format: ConnectedSystemsReadClient.omJSON,
-                decoder: decoder)
-            observations = page.observations.sorted { $0.phenomenonTime > $1.phenomenonTime }
+            // fetchMostRecent rather than `latest: true`, because a datastream
+            // that has stopped publishing answers "latest" with nothing even
+            // when its archive is full.
+            observations = try await connection.readClient.fetchMostRecent(
+                datastream: datastream, limit: 10, decoder: decoder)
             observationError = nil
         } catch {
             // A decode failure carries the path that failed, and that is the

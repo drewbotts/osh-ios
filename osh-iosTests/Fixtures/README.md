@@ -10,6 +10,9 @@ Recapture with:
 ```sh
 OSH_NODE=http://host:8080/sensorhub/api ./scripts/capture-fixtures.sh survey
 OSH_NODE=http://host:8080/sensorhub/api ./scripts/capture-fixtures.sh capture
+
+# one folder only, leaving the committed rest untouched
+OSH_NODE=http://host:8080/sensorhub/api ./scripts/capture-fixtures.sh capture kraken-doa
 ```
 
 `capture` is idempotent and re-runs `scripts/sync-fixture-membership.py`
@@ -55,7 +58,8 @@ successive `limit=N` responses because the datastream is archive-only.
 | `spectrum-array` | KrakenSDR Spectrum | two variable-size DataArrays sized by `elementCount` href |
 | `video-mjpeg` | Axis PTZ video1 | nested DataArray delivered as one JPEG block; no swe+json schema |
 | `gps` | Android gps_data | Time + Vector — the shape this app itself writes |
-| `kraken-settings` | KrakenSDR settings | deeply nested DataRecord |
+| `kraken-settings` | KrakenSDR settings | deeply nested DataRecord; a position at `/stationConfig/location` with a heading beside it |
+| `kraken-doa` | KrakenSDR DoA | a line of bearing with a confidence figure, and the station's own position stamped on every record |
 | `choice-ptz-control` | Axis ptzControl | the node's only DataChoice; seeds Pass 4 |
 
 ## Not represented on this node
@@ -65,6 +69,10 @@ successive `limit=N` responses because the datastream is archive-only.
 - **A DataChoice with messages.** The PTZ control stream has zero archived
   commands, so the binary choice-selector layout could not be verified against
   real bytes. See `OSHiOS/SWE/Decode/BINARY_FORMAT.md`.
+- **A system with a geometry.** Not one of the node's systems carries a point in
+  its registration or its sampling features, so `PositionKind.deployed` — the
+  static "installed here" marker — has no fixture behind it and is covered by
+  the synthetic cases in `RemoteSystemTests`.
 - **Matrix, Geometry, the Range types, and the unsigned and short integer
   dataTypes.** The decoder handles them; no fixture exercises them, and the
   synthetic tests in `SWEBinaryFormatTests` cover them instead.

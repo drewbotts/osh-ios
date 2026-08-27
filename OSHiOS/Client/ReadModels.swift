@@ -189,6 +189,53 @@ struct DatastreamSummary: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+// MARK: - ControlStreamSummary
+
+/// A control stream, as much of one as a read-only viewer needs.
+///
+/// Pass 4 adds command encoding and a params schema; until then this exists so
+/// the browser can list what a system accepts rather than silently omitting it.
+struct ControlStreamSummary: Codable, Identifiable, Hashable, Sendable {
+    let id: String
+    let name: String
+    let inputName: String?
+    let systemId: String?
+
+    init(id: String, name: String, inputName: String? = nil, systemId: String? = nil) {
+        self.id = id
+        self.name = name
+        self.inputName = inputName
+        self.systemId = systemId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, inputName
+        case label
+        case systemId   = "system@id"
+        case systemLink = "system@link"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeFlexibleString(forKey: .id) ?? ""
+        self.inputName = try container.decodeFlexibleString(forKey: .inputName)
+        self.name = try container.decodeFlexibleString(forKey: .name)
+            ?? container.decodeFlexibleString(forKey: .label)
+            ?? self.inputName
+            ?? self.id
+        self.systemId = try container.decodeFlexibleString(forKey: .systemId)
+            ?? container.decodeLinkHref(forKey: .systemLink).map(ResourceLink.lastPathComponent)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(inputName, forKey: .inputName)
+        try container.encodeIfPresent(systemId, forKey: .systemId)
+    }
+}
+
 // MARK: - Collection envelope
 
 /// Connected Systems collection responses: `{ "items": [...], "links": [...] }`.

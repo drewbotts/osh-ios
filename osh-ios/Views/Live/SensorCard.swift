@@ -1,13 +1,16 @@
 import SwiftUI
-import Charts
 
 // MARK: - SensorCard
 //
 // One live output, rendered entirely from its schema and its parsed
 // observations. Nothing here asks what class produced the data — the body is
 // chosen by SensorCardKind.from(schema:), labels come from the components, and
-// units come from the Quantities. That is what makes this the component a
-// remote-datastream viewer can reuse unchanged.
+// units come from the Quantities.
+//
+// Pass 3b hollowed it out: the three bodies now live in Views/Shared and are
+// shared with the node dashboard, which was always the point of writing them
+// against a DataRecord. What is left is the header, the status colour and the
+// choice between them.
 
 struct SensorCard: View {
 
@@ -22,9 +25,14 @@ struct SensorCard: View {
             header
 
             switch kind {
-            case .location(let paths): locationBody(paths)
-            case .video:               videoBody
-            case .fields:              fieldsBody
+            case .location(let paths):
+                LocationSummaryView(paths: paths, observation: sensor.latest)
+            case .video:
+                VideoBadgeView(stats: videoStats)
+            case .fields:
+                FieldRowsView(leaves: FieldRowsView.valueLeaves(of: sensor.schema),
+                              latest: sensor.latest,
+                              history: sensor.history)
             }
         }
         .padding(12)
@@ -82,148 +90,6 @@ struct SensorCard: View {
 
     private var rateText: String {
         String(format: "%.1f/s", sensor.stats.rate)
-    }
-
-    // MARK: Location body
-
-    @ViewBuilder
-    private func locationBody(_ paths: LocationPaths) -> some View {
-        if let latest = sensor.latest,
-           let latitude = latest.values[paths.latitude]?.asDouble,
-           let longitude = latest.values[paths.longitude]?.asDouble {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(String(format: "%.5f, %.5f", latitude, longitude))
-                    .font(.callout.monospacedDigit())
-                if let altitudePath = paths.altitude,
-                   let altitude = latest.values[altitudePath]?.asDouble {
-                    Text(String(format: "%.1f m", altitude))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-            }
-        } else {
-            waitingText
-        }
-    }
-
-    // MARK: Video body
-
-    @ViewBuilder
-    private var videoBody: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text("video")
-                .font(.callout)
-            if let stats = videoStats, stats.hasDimensions {
-                Text("\(stats.width)×\(stats.height)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Text(String(format: "%.1f fps · dropped %d",
-                            stats.encodedFPS, stats.droppedFrames))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("waiting for frames")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    // MARK: Fields body
-
-    @ViewBuilder
-    private var fieldsBody: some View {
-        let leaves = valueLeaves
-        if leaves.isEmpty {
-            waitingText
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(leaves, id: \.path) { leaf in
-                    fieldRow(leaf)
-                }
-            }
-        }
-    }
-
-    private func fieldRow(_ leaf: SchemaWalker.Leaf) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(label(for: leaf))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Text(valueText(for: leaf))
-                    .font(.caption.monospacedDigit())
-                    .lineLimit(1)
-            }
-
-            let samples = history(for: leaf.path)
-            if samples.count >= 2 {
-                Sparkline(values: samples)
-                    .frame(height: 28)
-            }
-        }
-    }
-
-    /// Every leaf except the time field — a timestamp row would repeat on every
-    /// card and say nothing about the sensor.
-    private var valueLeaves: [SchemaWalker.Leaf] {
-        SchemaWalker.leaves(of: sensor.schema).filter { !($0.component is TimeStamp) }
-    }
-
-    private func label(for leaf: SchemaWalker.Leaf) -> String {
-        leaf.component.label ?? leaf.path.lastComponent
-    }
-
-    private func valueText(for leaf: SchemaWalker.Leaf) -> String {
-        guard let value = sensor.latest?.values[leaf.path] else { return "—" }
-        guard let number = value.asDouble else { return value.asString }
-
-        let formatted = String(format: "%.2f", number)
-        if let quantity = leaf.component as? Quantity, quantity.uom != "1" {
-            return "\(formatted) \(quantity.uom)"
-        }
-        return formatted
-    }
-
-    private func history(for path: FieldPath) -> [Double] {
-        sensor.history.compactMap { $0.values[path]?.asDouble }.filter(\.isFinite)
-    }
-
-    private var waitingText: some View {
-        Text("waiting for data")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-    }
-}
-
-// MARK: - Sparkline
-
-/// A 60-sample trace with no axes, gridlines or labels. It is there to show
-/// shape and movement; the exact value is already on the row above it.
-struct Sparkline: View {
-    let values: [Double]
-
-    var body: some View {
-        Chart(Array(values.enumerated()), id: \.offset) { index, value in
-            LineMark(x: .value("Sample", index), y: .value("Value", value))
-        }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartLegend(.hidden)
-        .chartYScale(domain: domain)
-        .accessibilityHidden(true)
-    }
-
-    /// A flat series would otherwise collapse to a zero-height scale and vanish.
-    private var domain: ClosedRange<Double> {
-        guard let low = values.min(), let high = values.max() else { return 0...1 }
-        if low == high {
-            let pad = max(abs(low) * 0.01, 0.5)
-            return (low - pad)...(high + pad)
-        }
-        return low...high
     }
 }
 

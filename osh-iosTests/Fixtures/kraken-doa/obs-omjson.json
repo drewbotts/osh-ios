@@ -1,0 +1,56 @@
+{
+  "items": [
+    {
+      "id": "0g0otpnaq43237fl00",
+      "datastream@id": "0g10",
+      "phenomenonTime": "2026-06-23T16:23:42.564Z",
+      "resultTime": "2026-06-23T16:23:42.564Z",
+      "result": {
+        "raw_lob": 64.0,
+        "confidence": 0.8292805403470993,
+        "rssi": -58.75828170776367,
+        "frequency": 1.62525195E8,
+        "time-delta": 436.0,
+        "uuid": "kraken001",
+        "location": {"lat": 20.0,"lon": 80.0}
+      }
+    },
+    {
+      "id": "0g0ovpnaq43389rgo0",
+      "datastream@id": "0g10",
+      "phenomenonTime": "2026-06-23T16:23:43.875Z",
+      "resultTime": "2026-06-23T16:23:43.875Z",
+      "result": {
+        "raw_lob": 70.0,
+        "confidence": 0.7737463712692261,
+        "rssi": -58.3061408996582,
+        "frequency": 1.62525195E8,
+        "time-delta": 436.0,
+        "uuid": "kraken001",
+        "location": {"lat": 20.0,"lon": 80.0}
+      }
+    },
+    {
+      "id": "0g0p1pnaq431565u00",
+      "datastream@id": "0g10",
+      "phenomenonTime": "2026-06-23T16:23:44.312Z",
+      "resultTime": "2026-06-23T16:23:44.312Z",
+      "result": {
+        "raw_lob": 259.0,
+        "confidence": 2.5797253847122192,
+        "rssi": -58.71759033203125,
+        "frequency": 1.62425E8,
+        "time-delta": 436.0,
+        "uuid": "kraken001",
+        "location": {"lat": 20.0,"lon": 80.0}
+      }
+    }
+  ],
+  "links": [
+    {
+      "rel": "next",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g10/observations?limit=3&offset=3&f=application%2Fom%2Bjson",
+      "type": "application/om+json"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "time": "2026-08-27T14:55:50.588Z",
+    "raw_lob": 64.0,
+    "confidence": 0.8292805403470993,
+    "rssi": -58.75828170776367,
+    "frequency": 1.62525195E8,
+    "time-delta": 436.0,
+    "uuid": "kraken001",
+    "location": {"lat": 20.0,"lon": 80.0}
+  },
+  {
+    "time": "2026-08-27T14:55:51.723Z",
+    "raw_lob": 70.0,
+    "confidence": 0.7737463712692261,
+    "rssi": -58.3061408996582,
+    "frequency": 1.62525195E8,
+    "time-delta": 436.0,
+    "uuid": "kraken001",
+    "location": {"lat": 20.0,"lon": 80.0}
+  },
+  {
+    "time": "2026-08-27T14:55:52.858Z",
+    "raw_lob": 259.0,
+    "confidence": 2.5797253847122192,
+    "rssi": -58.71759033203125,
+    "frequency": 1.62425E8,
+    "time-delta": 436.0,
+    "uuid": "kraken001",
+    "location": {"lat": 20.0,"lon": 80.0}
+  }
+]

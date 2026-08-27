@@ -7,7 +7,7 @@ import Foundation
 // The tree is a FOLDER REFERENCE in the test target, so it is copied into the
 // bundle with its directory structure intact and adding a fixture needs no
 // project edit beyond the membership list that scripts/capture-fixtures.sh
-// regenerates. That structure is the point: seven folders each hold a
+// regenerates. That structure is the point: every folder holds its own
 // "schema-json.json", and a flat copy would collapse them onto one file.
 //
 // The bundle copy is preferred, with the source tree as a fallback so the
@@ -23,6 +23,7 @@ enum FixtureLoader {
         case videoMJPEG         = "video-mjpeg"          // nested DataArray + BinaryBlock
         case gps                                          // Time + Vector, as this app writes
         case krakenSettings     = "kraken-settings"      // deeply nested DataRecord
+        case krakenDOA          = "kraken-doa"            // direction finding: LOB + confidence
         case choicePTZControl   = "choice-ptz-control"   // DataChoice (control stream)
     }
 

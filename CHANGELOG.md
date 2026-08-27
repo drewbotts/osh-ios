@@ -5,6 +5,164 @@ than by release, because the app has not shipped a versioned build yet.
 
 ---
 
+## Pass 3b — the viewer
+
+Systems discovered on a node are now matched to visualisations **purely from
+their data structures**. Nothing in the viewer asks which driver wrote a stream:
+a map marker, a bearing dial, a waterfall or a video tile is chosen because the
+record carries a location vector, an azimuth, a numeric array or a binary block.
+That is what lets the app render a KrakenSDR it has never seen with the same
+code that renders this phone, and why no stream on any node is unviewable — a
+schema nothing else matches still renders as labelled rows.
+
+Built and verified against a live node holding thirteen systems and forty-eight
+datastreams. The test suite still runs from the committed fixtures alone.
+
+### Added
+
+**Datastream role inference** (`OSHiOS/Viewer/DatastreamRole.swift`). Eight
+ordered rules turn a `DataRecord` and its binary encoding into a
+`DatastreamRole`: `.location`, `.orientation`, `.bearing`, `.video`, `.chart`,
+`.timeseries`, `.status` or `.generic`, each carrying the field paths its card
+needs. Keywords longer than four characters match as substrings; shorter ones —
+`doa`, `lob`, `aoa`, `id` — match whole tokens only, because `globe` contains
+`lob` and half the fields in any schema contain `id`. The rules, the keyword
+lists and how to extend both are documented in `OSHiOS/Viewer/ROLES.md`.
+
+**Entity keys** (`EntityKey.swift`). One AIS datastream carries every vessel in
+range, so "the latest observation" is not a position — it is whichever ship last
+transmitted. The MMSI is found from the schema and observations are bucketed by
+its value, giving one marker per vessel. Only location streams are grouped:
+every stream has an identifier somewhere, and splitting a weather station's
+readings by its own serial number produces one bucket and a lot of ceremony.
+
+**Embedded positions.** `RemoteDatastream.embeddedPosition` resolves a location
+vector at *any* depth in any record, so a system that publishes no position
+output still lands on the map. KrakenSDR states where it stands inside its
+settings record at `/stationConfig/location`, with the array heading beside it.
+
+**`RemoteSystem` and `RemoteSystemLoader`.** A system resolved far enough to
+draw: its datastreams with roles, its subsystems, its control-stream count and
+its deployment location. Schemas are fetched four at a time and put back in
+listing order; a datastream whose schema will not decode becomes a `.generic`
+one carrying its error text, so one bad schema costs that card and not the
+screen. Systems are cached per `(server, system)` for five minutes.
+
+**`SystemLiveSession`.** One system watched live: an `ObservationStream` per
+selected datastream, all of them routed through a single `TimeSynchronizer` so a
+video frame and the fix taken at the same instant are published together.
+History rings at 300 per datastream; video blocks go to the MJPEG decoder rather
+than into a ring. Video is excluded from the default selection — bandwidth is
+the scarce thing on a phone — and the whole set is capped at eight sockets,
+ordered so a position or a line of bearing outranks a settings dump.
+
+**Archive bootstrap.** Positions and scalar series pre-fill from the last half
+hour; bearings and embedded positions fetch a single most-recent record of any
+age, because a direction-finding output emits only on detection and its last LOB
+may be months old and still the thing to show. Overlap with the live edge is
+deduplicated by phenomenonTime to the millisecond, per datastream and entity.
+
+**The system browser** (`Views/Browser/`). Every system on the node with its
+glyph, ids and badges — datastreams, subsystems, control streams — loaded lazily
+as rows appear, with a search field over names and UIDs. Replaces the read-only
+"Browse systems on node" disclosure group on the Node tab.
+
+**The system dashboard.** A grid of role-driven cards: a map card with rotated
+markers per entity, a heading dial, a bearing compass with a prominent "as of"
+line, an MJPEG player, a spectrum waterfall, rows with sparklines, a grouped
+settings list. Cards are ordered status → bearing → the rest, so a
+direction-finding station reads top-down as "here is the station, here is what
+it heard". The session starts on appear and stops on disappear.
+
+**Node mode on the Map tab.** A segmented control between "This Device" — the
+existing track map, unchanged — and "Node", which plots every positioned system
+on the node. Position source is `PositionKind`: `.live` from a location
+datastream, `.reported` from an embedded position, `.deployed` from the system
+resource, each with its own marker treatment. Up to five systems hold live
+subscriptions, chosen by freshness; the rest show their last archived position.
+Tapping a marker opens a sheet with the same cards in the same order.
+
+**Lines of bearing.** Drawn from a system's position at the observed angle, with
+the endpoint computed geodesically — never as a screen-space rotation, which at
+60° north would turn a 45° bearing into a 63° line. A LOB fades to 30% after a
+minute and is **never** removed, because direction finding emits only on
+detection and "the last thing we heard" is the answer to the question being
+asked.
+
+**SDR waterfall** (`WaterfallBuffer.swift`, `WaterfallView.swift`). 200 rows of
+amplitude as colour, newest at the top: one memmove and one row of pixels per
+observation, a viridis colormap, a rolling dB range with 5% headroom, and a
+`CGImage` rebuilt off the main actor. No per-pixel views and no Charts. A
+frequency-axis chart defaults to it, with a Waterfall | Spectrum toggle.
+
+**MJPEG decoding** (`Viewer/Video/MJPEGDecoder.swift`). JPEG blocks to
+`CGImage` through ImageIO, on an actor so a 1280×720 frame never decodes on the
+main actor. A truncated frame is dropped rather than half-drawn: ImageIO reports
+an incomplete JPEG as complete and returns the top half of the picture, so the
+SOI and EOI markers are checked first. H.264 blocks are counted and sized into a
+placeholder card that proves the stream works — decoding them is Pass 3d.
+
+**`listControlStreams`** on the read client, and `ControlStreamSummary`. Listed
+read-only; commanding is Pass 4.
+
+**`fetchMostRecent(datastream:limit:decoder:)`** on the read client. On the
+reference node `phenomenonTime=latest` means *the current value of a live
+stream*, so a datastream that has stopped publishing answers with an empty
+collection however full its archive is. This takes that fast path for an open
+stream and otherwise queries the tail of the datastream's own reported time
+range, widening the window until records turn up. Without it every
+direction-finding output on the node showed "no detections yet".
+
+**A `kraken-doa` fixture** — the KrakenSDR DOA output, captured over REST
+because the stream emits only on detection and the WebSocket capture times out,
+exactly as the other archive-only fixtures were. `capture-fixtures.sh capture`
+now takes an optional slug filter so one fixture can be refreshed without
+rewriting the committed rest.
+
+### Changed
+
+**Credentials are optional.** A server may be saved with no username and no
+password, and an empty username means **no `Authorization` header at all** —
+in the read client, the write client and the WebSocket handshake alike. Sending
+`Basic OjE=` is not neutral: a node with anonymous read enabled tries to
+authenticate the empty user, fails, and answers 401 for a resource it would have
+served happily to a request with no header. The Keychain stores an empty
+password by removing the item rather than writing zero bytes.
+
+**`LocationPaths.resolve` searches recursively**, breadth before depth, so a
+top-level fix still wins and a position buried in a settings record now
+resolves. Heading resolution follows it: `HeadingPath.resolve` looks among the
+location vector's siblings first and only then at the record's top level,
+because a heading belongs to the position it was measured with. It prefers a
+true heading over a plain one over course over ground — one is where the hull
+points, the other where the ship is going.
+
+**`SensorCard` is a thin wrapper.** Its three bodies moved to
+`Views/Shared/FieldRowsView`, `LocationSummaryView` and `VideoBadgeView`, which
+the node dashboard now shares. The Live tab renders exactly what it did.
+
+**`DatastreamDetailView` is reachable for remote datastreams**, from an info
+button on every dashboard card — closing the drill-down gap Pass 3a left. It now
+fetches its ten observations with `fetchMostRecent`, so an archive-only stream
+shows records instead of nothing.
+
+**The Map tab has two sources.** The device track map is unchanged and none of
+the node code can reach it: a track being recorded has to keep working whether
+or not a node is configured, reachable or interesting.
+
+### Notes
+
+`.deployed` positions are implemented and unit-tested but could not be verified
+against the reference node — no system there carries a geometry in its
+registration or its sampling features.
+
+Two Tempest outputs (`Rain Start Event`, on both weather systems) classify as
+`.generic`: their record is a bare timestamp with no numeric leaf at all, which
+is exactly the case rule 8 exists for. They render as an empty row list with
+their arrival time, which is all there is to show.
+
+---
+
 ## Pass 3a — schema-driven SWE Common decoder
 
 The app can now read a datastream it did not write. A schema fetched from any

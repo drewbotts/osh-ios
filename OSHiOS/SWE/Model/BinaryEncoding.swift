@@ -142,11 +142,53 @@ struct DecodedBinaryEncoding: Sendable {
         return nil
     }
 
+    /// True when this encoding carries a Block member anywhere — the test for
+    /// "observations on this datastream are frames, not scalars".
+    ///
+    /// Distinct from `blockCompression != nil`: a node may declare a Block with
+    /// no compression attribute at all, and that is still a block stream.
+    var hasBinaryBlock: Bool {
+        members.contains { if case .block = $0.kind { return true } else { return false } }
+    }
+
     /// True when a Block member sits at exactly `path` — the test for "this
     /// DataArray arrives as one opaque frame".
     func hasBlock(at path: FieldPath) -> Bool {
         guard let member = member(for: path) else { return false }
         if case .block = member.kind { return true }
         return false
+    }
+}
+
+// MARK: - Bridging the encode side
+
+extension DecodedBinaryEncoding {
+
+    /// Reads an encoding this app *wrote* as one a node *reported*.
+    ///
+    /// The two types describe the same wire format from opposite directions,
+    /// and the viewer's role inference only speaks the read side. Without this
+    /// the app could classify every datastream on a node and none of its own.
+    init(_ encoding: BinaryEncoding) {
+        self.init(
+            byteOrder: ByteOrder.parse(encoding.byteOrder),
+            byteEncoding: encoding.byteEncoding,
+            members: encoding.fields.map { field in
+                switch field.type {
+                case .scalar(let dataType):
+                    return BinaryMember(ref: field.ref,
+                                        kind: .component(dataType: dataType,
+                                                         byteLength: nil,
+                                                         significantBits: nil,
+                                                         bitLength: nil))
+                case .block(let compression):
+                    return BinaryMember(ref: field.ref,
+                                        kind: .block(compression: compression,
+                                                     encryption: nil,
+                                                     byteLength: nil,
+                                                     paddingBytesBefore: nil,
+                                                     paddingBytesAfter: nil))
+                }
+            })
     }
 }

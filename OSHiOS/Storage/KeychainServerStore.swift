@@ -102,6 +102,13 @@ final class KeychainServerStore {
     // MARK: - Keychain helpers
 
     private func savePassword(_ password: String, for id: UUID) {
+        // An anonymous server has no secret to keep. Storing zero bytes is
+        // rejected by some Keychain versions and reads back as "" from all of
+        // them, so the item is removed instead — same result, no failed write.
+        guard !password.isEmpty else {
+            deletePassword(for: id)
+            return
+        }
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: Self.keychainService,

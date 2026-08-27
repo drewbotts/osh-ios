@@ -33,7 +33,8 @@ final class ObservationStream: Sendable {
     let datastreamId: String
 
     private let url: URL
-    private let authHeader: String
+    /// nil for an anonymous node — see BasicAuth.
+    private let authHeader: String?
     private let decoder: DatastreamDecoder
     private let format: String
     private let state: StreamState
@@ -61,8 +62,8 @@ final class ObservationStream: Sendable {
         self.state = StreamState()
 
         let server = connection.server
-        self.authHeader = "Basic " + Data("\(server.username):\(server.password)".utf8)
-            .base64EncodedString()
+        self.authHeader = BasicAuth.header(username: server.username,
+                                           password: server.password)
         self.url = Self.streamURL(base: server.url,
                                   datastreamId: datastreamId,
                                   format: self.format,
@@ -139,7 +140,9 @@ final class ObservationStream: Sendable {
         while await state.isRunning {
             let session = URLSession(configuration: .default)
             var request = URLRequest(url: url)
-            request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+            if let authHeader {
+                request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+            }
 
             let task = session.webSocketTask(with: request)
             await state.setTask(task)

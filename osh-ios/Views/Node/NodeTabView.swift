@@ -17,11 +17,6 @@ struct NodeTabView: View {
     @State private var datastreamError: String?
     @State private var isLoadingDatastreams = false
 
-    @State private var systems: [SystemSummary] = []
-    @State private var systemsError: String?
-    @State private var isLoadingSystems = false
-    @State private var showSystems = false
-
     @State private var showResetAlert = false
 
     var body: some View {
@@ -249,50 +244,16 @@ struct NodeTabView: View {
 
     private var systemsSection: some View {
         Section {
-            DisclosureGroup("Browse systems on node", isExpanded: $showSystems) {
-                if isLoadingSystems {
-                    HStack { ProgressView().controlSize(.small); Text("Loading…") }
-                        .foregroundStyle(.secondary)
-                } else if let systemsError {
-                    Label(systemsError, systemImage: "exclamationmark.triangle")
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                } else if systems.isEmpty {
-                    Text("No systems returned.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(systems) { system in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(system.name)
-                            Text(system.id)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+            NavigationLink {
+                SystemBrowserView()
+            } label: {
+                Label("Browse node…", systemImage: "square.grid.2x2")
             }
-            .onChange(of: showSystems) { _, expanded in
-                guard expanded else { return }
-                Task { await loadSystems() }
-            }
+            .disabled(connections.active == nil)
         } header: {
             Text("Systems")
         } footer: {
-            Text("Read-only for now. A later pass turns this into a full system browser.")
-        }
-    }
-
-    private func loadSystems() async {
-        guard let connection = connections.active else { return }
-        isLoadingSystems = true
-        defer { isLoadingSystems = false }
-        do {
-            systems = try await connection.readClient.listSystems()
-            systemsError = nil
-        } catch {
-            systemsError = error.localizedDescription
-            Log.client.error("System listing failed: \(error.localizedDescription, privacy: .public)")
+            Text("Every system on the node, with a live dashboard per system.")
         }
     }
 }

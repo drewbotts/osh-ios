@@ -24,7 +24,6 @@ struct ServerDetailView: View {
 
     @State private var labelError: String?
     @State private var urlError: String?
-    @State private var usernameError: String?
 
     // MARK: - Connection test
 
@@ -84,7 +83,7 @@ struct ServerDetailView: View {
     }
 
     private var connectionSection: some View {
-        Section("Connection") {
+        Section {
             VStack(alignment: .leading, spacing: 4) {
                 TextField("http://url:port/sensorhub/api", text: $url)
                     .keyboardType(.URL)
@@ -95,16 +94,17 @@ struct ServerDetailView: View {
                     Text(err).font(.caption).foregroundStyle(.red)
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                TextField("Username", text: $username)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .onChange(of: username) { _, _ in usernameError = nil }
-                if let err = usernameError {
-                    Text(err).font(.caption).foregroundStyle(.red)
-                }
-            }
-            SecureField("Password", text: $password)
+            TextField("Username (optional)", text: $username)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            SecureField("Password (optional)", text: $password)
+        } header: {
+            Text("Connection")
+        } footer: {
+            // Not every node wants credentials, and sending empty ones is worse
+            // than sending none: a node with anonymous read enabled answers 401
+            // to an empty Basic user it would have served without a header.
+            Text("Leave the username blank for a node that allows anonymous access.")
         }
     }
 
@@ -185,9 +185,8 @@ struct ServerDetailView: View {
     @discardableResult
     private func validate() -> Bool {
         var valid = true
-        let trimLabel    = label.trimmingCharacters(in: .whitespaces)
-        let trimURL      = url.trimmingCharacters(in: .whitespaces)
-        let trimUsername = username.trimmingCharacters(in: .whitespaces)
+        let trimLabel = label.trimmingCharacters(in: .whitespaces)
+        let trimURL   = url.trimmingCharacters(in: .whitespaces)
 
         if trimLabel.isEmpty {
             labelError = "Label is required"
@@ -198,10 +197,6 @@ struct ServerDetailView: View {
             valid = false
         } else if !trimURL.hasPrefix("http://") && !trimURL.hasPrefix("https://") {
             urlError = "URL must start with http:// or https://"
-            valid = false
-        }
-        if trimUsername.isEmpty {
-            usernameError = "Username is required"
             valid = false
         }
         return valid

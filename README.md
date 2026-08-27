@@ -141,7 +141,18 @@ OSHiOS/                     the app's engine — no SwiftUI
 │   │   ├── DatastreamDecoder       one datastream: schema + tree + decode()
 │   │   └── BINARY_FORMAT.md        the verified byte layouts, and what is not
 │   ├── SchemaWalker                leaf paths; values → ParsedObservation
-│   └── LocationPaths               finds lat/lon/alt inside any Location record
+│   └── LocationPaths               finds lat/lon/alt at any depth, plus heading
+├── Viewer/                 what a datastream *is*, and how to watch one
+│   ├── DatastreamRole              schema → role: location, bearing, chart, …
+│   ├── EntityKey                   which field names the thing an obs is about
+│   ├── RemoteSystem                a node system resolved far enough to draw
+│   ├── RemoteSystemLoader          actor: schemas concurrently, 5-min cache
+│   ├── SystemLiveSession           one system watched live, entity-bucketed
+│   ├── SystemGlyph                 role → SF Symbol, one table for every screen
+│   ├── BearingGeometry             geodesic LOB endpoints; BearingStyle
+│   ├── WaterfallBuffer             SDR waterfall pixels, no SwiftUI
+│   ├── Video/MJPEGDecoder          JPEG blocks → CGImage, off the main actor
+│   └── ROLES.md                    the inference rules, and how to extend them
 ├── OGC/                    schema *builders* (kept where the port put them)
 │   ├── SWE/                        SWEConstants, GeoPosHelper, VideoCamHelper
 │   └── SensorML/                   SystemDescriptor (POST /systems body)
@@ -163,8 +174,13 @@ osh-ios/                    the SwiftUI app
 └── Views/
     ├── Live/               session bar + schema-driven SensorCard
     ├── Camera/             preview and encoder settings
-    ├── Map/                TrackMapView (takes plain [TrackPoint])
-    ├── Node/               server, registration, datastreams, systems
+    ├── Browser/            SystemBrowserView, SystemDashboardView,
+    │                       DatastreamCard — the role-driven card grid
+    ├── Map/                TrackMapView (this device) + NodeMapView (the node)
+    ├── Node/               server, registration, datastreams, browser entry
+    ├── Shared/             FieldRowsView, LocationSummaryView, VideoBadgeView,
+    │                       SystemMapView, HeadingMarker, HeadingDialView,
+    │                       WaterfallView, MJPEGView
     ├── Logs/               in-app log tail
     └── Settings/           system name, servers, sensors, rates, behavior
 ```
@@ -196,10 +212,79 @@ for await event in stream.events { … }
 ascending: a plain `limit: 10` returns the ten *oldest* records in the archive,
 which is almost never what a caller asking for recent activity means.
 
+`latest:` is not the same as "the newest records this datastream holds", and the
+difference matters. On the reference node `phenomenonTime=latest` means *the
+current value of a live stream*, so a datastream that has stopped publishing
+answers with an empty collection however full its archive is — which is exactly
+the state a direction-finding output is in between detections. Use
+`fetchMostRecent(datastream:limit:decoder:)` when you want the newest records
+whatever their age: it takes the fast path for an open stream and otherwise
+queries the tail of the datastream's own reported time range, widening the
+window until records turn up.
+
 `OSHiOS/SWE/Decode/BINARY_FORMAT.md` records the swe+binary layouts that were
 verified against a live node, which fixture each was verified against, and the
 one — the DataChoice selector — that could not be verified because no node
 message exercising it exists.
+
+### Viewing a system
+
+The viewer matches systems to visualisations **purely from their data
+structures**. Nothing asks which driver wrote a stream: a card, a marker, a dial
+or a waterfall is chosen because the record carries a location vector, a
+quaternion, an azimuth or a numeric array. That is what lets the app render a
+KrakenSDR it has never seen with the same code that renders this phone.
+
+```swift
+let loader = RemoteSystemLoader()
+guard case .success(let system) = await loader.load(systemId: id,
+                                                    using: connection.readClient,
+                                                    serverId: server.id) else { return }
+
+let session = SystemLiveSession(system: system, connection: connection)
+session.start()                 // everything but video, capped at 8 streams
+…
+session.stop()
+```
+
+**Roles.** `DatastreamRoleInference.role(schema:encoding:datastreamName:)`
+returns one of `.location`, `.orientation`, `.bearing`, `.video`, `.chart`,
+`.timeseries`, `.status` or `.generic`, carrying the field paths the card needs.
+`.generic` is a fallback that always renders, so no stream on any node is
+unviewable. The ordered rules, the keyword lists and how to add to either are in
+`OSHiOS/Viewer/ROLES.md`.
+
+**Entity keys.** One AIS datastream carries every vessel in range, so
+"the latest observation" is not a position — it is whichever ship last
+transmitted. `EntityKeyInference` finds the identifying field (`/mmsi`) and
+`SystemLiveSession` buckets observations by its value; a single-entity stream
+uses `""` as its one bucket. Only `.location` streams are grouped.
+
+**Embedded positions.** `RemoteDatastream.embeddedPosition` is computed for
+every datastream whose record holds a location vector at any depth, and is nil
+when the role is already `.location`. This is how a system with no position
+output still lands on the map: KrakenSDR states where it stands inside its
+settings record, at `/stationConfig/location`, with the array heading beside it.
+
+**PositionKind.** `.live` (a location datastream) beats `.reported` (an embedded
+position) beats `.deployed` (the system resource's own geometry). The marker
+looks different for each, because "we are tracking this" and "someone typed this
+in once" should not read the same. A deployed marker never rotates.
+
+**SystemLiveSession.** One `ObservationStream` per selected datastream, all of
+them routed through one `TimeSynchronizer` so a video frame and the fix taken at
+the same instant are published together. History rings at 300 per datastream;
+video blocks go to the MJPEG decoder rather than into a ring. It bootstraps from
+the archive on start — half an hour for positions and scalar series, a single
+most-recent record for bearings and embedded positions, because a
+direction-finding output emits only on detection and its last LOB may be months
+old and still the thing to show.
+
+**Lines of bearing persist.** A LOB fades to 30% after a minute and is never
+removed, and every card and sheet showing one says when it was observed. Its
+endpoint is computed geodesically (`BearingGeometry.destination`) and never as a
+screen-space rotation: at 60° north a Mercator projection turns a 45° bearing
+into a 63° line.
 
 ### Two rules worth knowing before changing anything
 
@@ -320,14 +405,18 @@ arbitrary loads for local addresses; a public node should use HTTPS.
   `MaxKeyFrameInterval = 1` so each observation is independently decodable — the
   node stores frames as discrete observations with no GOP context. The cost is a
   much higher bitrate than a normal GOP structure would need.
-- **The decoded schema browser is only reachable for this device's own
-  datastreams.** `DatastreamDetailView` now shows a decoded schema tree and the
-  last ten observations, but the Node tab reaches it only from the datastreams
-  this device registered — the "Browse systems on node" list is still read-only
-  rows with no drill-down. The decoder handles every datastream on the reference
-  node; the navigation to them does not exist yet.
-- **The server form requires a username** even against a node configured for
-  anonymous access, so such a node has to be given throwaway credentials.
+- **H.264 video is not decoded.** MJPEG streams render; an H.264 camera shows a
+  placeholder card that reports its arriving frame rate and frame sizes, which
+  proves the stream works without pretending to draw it. Pass 3d.
+- **Control streams are listed, never sent.** A commandable system shows how
+  many control streams it has and nothing more. Pass 4.
+- **No map clustering.** SwiftUI's `Map` exposes none on iOS 18, so the node map
+  decimates to the newest 100 markers and says so in its legend rather than
+  quietly truncating a busy anchorage.
+- **A chart card does not backfill from the archive.** Positions and scalar
+  series bootstrap from the last half hour and bearings from their last
+  observation, but a spectrum starts empty and fills as frames arrive, so a
+  waterfall on a quiet stream reads "waiting for spectra".
 - **Live Activity and camera preview are device-only.** Both are wired up but
   cannot be exercised meaningfully in the simulator.
 - **Six tabs means a "More" tab.** iOS collapses tabs past the fifth on iPhone,
@@ -337,13 +426,11 @@ arbitrary loads for local addresses; a public node should use HTTPS.
 
 ## Roadmap
 
-- **Viewer.** Render observations fetched from a node using the same
-  `SensorCard` and `TrackMapView` components the live tabs use. The pieces are
-  already in place: `ParsedObservation`, `SchemaWalker`, `LocationPaths` and
-  `TrackPoint` know nothing about local sensors.
-- **SWE schema decoding**, so a remote datastream produces a real `DataRecord`
-  instead of a JSON blob.
-- **MJPEG** output alongside H.264, for clients that cannot decode a bare
+- **H.264 decoding** (Pass 3d), so the node's cameras render rather than
+  reporting their frame rate.
+- **Commands** (Pass 4), so a node can drive the phone rather than only listen
+  to it — the control streams are already listed and their DataChoice params
+  already decode.
+- **MJPEG** *output* alongside H.264, for clients that cannot decode a bare
   Annex-B stream.
-- **Commands**, so a node can drive the phone rather than only listen to it.
 - **Garmin** wearable sensors as an additional set of outputs.

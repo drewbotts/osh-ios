@@ -5,7 +5,8 @@ import Foundation
 // URLSession-based HTTP client for the OGC Connected Systems API.
 //
 // Base URL:  http(s)://<host>:<port>/<path>/  (e.g. http://host:8181/sensorhub/api/)
-// Auth:      HTTP Basic (Base64 encoded username:password in Authorization header)
+// Auth:      HTTP Basic (Base64 encoded username:password in Authorization header),
+//            or none at all when the server config has no username — see BasicAuth.
 //
 // All methods are async/await.
 //
@@ -17,7 +18,8 @@ import Foundation
 actor ConnectedSystemsClient {
 
     private let baseURL: URL
-    private let authHeader: String
+    /// nil for an anonymous node — see BasicAuth.
+    private let authHeader: String?
     private let session: URLSession
 
     // MARK: Shared timestamp formatter
@@ -47,10 +49,7 @@ actor ConnectedSystemsClient {
         }
         self.baseURL = url
 
-        let cred = "\(username):\(password)"
-            .data(using: .utf8)!
-            .base64EncodedString()
-        self.authHeader = "Basic \(cred)"
+        self.authHeader = BasicAuth.header(username: username, password: password)
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest  = 30
@@ -479,7 +478,7 @@ actor ConnectedSystemsClient {
         let url = baseURL.appendingPathComponent("systems")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        if let authHeader { request.setValue(authHeader, forHTTPHeaderField: "Authorization") }
         do {
             let (_, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
@@ -511,7 +510,7 @@ actor ConnectedSystemsClient {
     private func resourceExists(url: URL) async throws -> Bool {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        if let authHeader { request.setValue(authHeader, forHTTPHeaderField: "Authorization") }
         let (_, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw ClientError.invalidResponse
@@ -539,7 +538,7 @@ actor ConnectedSystemsClient {
         request.httpMethod = "POST"
         request.httpBody   = body
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        if let authHeader { request.setValue(authHeader, forHTTPHeaderField: "Authorization") }
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {

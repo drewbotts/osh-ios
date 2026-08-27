@@ -165,7 +165,12 @@ PY
 #   video-mjpeg         nested DataArray + BinaryBlock; no swe+json schema (400)
 #   gps                 Time + Vector, the shape this app itself writes
 #   kraken-settings     nested DataRecord, deepest tree on the node
+#   kraken-doa          direction-finding LOB; emits only on detection, so its
+#                       binary capture comes from REST rather than the socket
 #   choice-ptz-control  control stream whose paramsSchema is a DataChoice
+#
+# `capture` takes an optional slug filter — `capture kraken-doa` refreshes one
+# fixture folder and leaves the committed rest untouched.
 # ─────────────────────────────────────────────────────────────────────────────
 do_capture() {
 python3 - <<PY
@@ -173,6 +178,7 @@ $PY_COMMON
 import os
 
 FIXTURES = os.environ["FIXTURE_ROOT"]
+ONLY = [s for s in os.environ.get("CAPTURE_ONLY", "").split() if s]
 
 DATASTREAMS = [
     # slug,                 datastream id,  system id
@@ -182,6 +188,7 @@ DATASTREAMS = [
     ("video-mjpeg",         "02jr71ulsgig", "02luf9f2mgag"),
     ("gps",                 "0k0g",         "0k0g"),
     ("kraken-settings",     "0g0g",         "0g0g"),
+    ("kraken-doa",          "0g10",         "0g0g"),
 ]
 
 # slug -> (system id, control stream id)
@@ -329,6 +336,8 @@ def ws_capture(did, count=3, timeout=30):
 
 # ── datastream fixtures ──────────────────────────────────────────────────────
 for slug, did, sid in DATASTREAMS:
+    if ONLY and slug not in ONLY:
+        continue
     print(f"[{slug}] datastream {did} (system {sid})")
     write_if_200(slug, "datastream.json", f"/datastreams/{did}")
     write_if_200(slug, "schema-json.json",
@@ -347,6 +356,8 @@ for slug, did, sid in DATASTREAMS:
 
 # ── control stream fixtures (Pass 4 seed; no command support in this pass) ────
 for slug, sid, csid in CONTROL_STREAMS:
+    if ONLY and slug not in ONLY:
+        continue
     print(f"[{slug}] control stream {csid} (system {sid})")
     write_if_200(slug, "controlstreams.json", f"/systems/{sid}/controlstreams?limit=100")
     write_if_200(slug, "control-schema.json",
@@ -358,6 +369,7 @@ PY
 case "$MODE" in
   survey)  do_survey ;;
   capture)
+    export CAPTURE_ONLY="${*:2}"
     do_capture
     echo
     echo "Syncing Xcode project"
@@ -367,5 +379,5 @@ case "$MODE" in
     python3 "$REPO_ROOT/scripts/sync-fixture-membership.py"
     ;;
   sync)    python3 "$REPO_ROOT/scripts/sync-fixture-membership.py" ;;
-  *) echo "usage: $0 [survey|capture|sync]" >&2; exit 2 ;;
+  *) echo "usage: $0 [survey|capture [slug...]|sync]" >&2; exit 2 ;;
 esac

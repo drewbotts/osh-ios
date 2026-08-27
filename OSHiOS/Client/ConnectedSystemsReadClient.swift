@@ -20,7 +20,8 @@ import CoreLocation
 actor ConnectedSystemsReadClient {
 
     private let baseURL: URL
-    private let authHeader: String
+    /// nil for an anonymous node — see BasicAuth.
+    private let authHeader: String?
     private let session: URLSession
 
     // MARK: Init
@@ -33,10 +34,7 @@ actor ConnectedSystemsReadClient {
         }
         self.baseURL = url
 
-        let cred = "\(username):\(password)"
-            .data(using: .utf8)!
-            .base64EncodedString()
-        self.authHeader = "Basic \(cred)"
+        self.authHeader = BasicAuth.header(username: username, password: password)
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest  = 30
@@ -192,6 +190,75 @@ actor ConnectedSystemsReadClient {
         return try await fetchObservations(url: url, format: format, decoder: decoder)
     }
 
+    /// The most recent observations on a datastream, however old they are.
+    ///
+    /// `phenomenonTime=latest` is not this. On the reference node it means "the
+    /// current value of a live stream", and a datastream that stopped
+    /// publishing has none — it answers with an empty collection for a stream
+    /// holding thousands of archived records. That is exactly the case a
+    /// direction-finding output is in: KrakenSDR emits only when it detects a
+    /// signal, and the LOB worth showing may be from June.
+    ///
+    /// So the datastream's own reported time range is used to query its tail,
+    /// widening the window until enough records turn up. `latest` stays the
+    /// fast path for a stream the node still considers open.
+    ///
+    /// - Returns: up to `limit` observations, newest first. Empty when the
+    ///   datastream has never produced one.
+    func fetchMostRecent(datastream: DatastreamSummary,
+                         limit: Int = 1,
+                         decoder: DatastreamDecoder) async throws -> [ParsedObservation] {
+
+        let upperBound = datastream.phenomenonTimeRange?.last
+        let isOpen = upperBound == nil
+            || upperBound?.caseInsensitiveCompare("now") == .orderedSame
+
+        if isOpen {
+            let page = try await fetchObservations(datastreamId: datastream.id,
+                                                   latest: true,
+                                                   limit: limit,
+                                                   format: Self.omJSON,
+                                                   decoder: decoder)
+            if !page.observations.isEmpty {
+                return page.observations.sorted { $0.phenomenonTime > $1.phenomenonTime }
+            }
+        }
+
+        guard let upperBound, let end = Self.parseTimestamp(upperBound) else { return [] }
+
+        // Widened rather than guessed: the node reports when the last record
+        // landed but not how fast they arrive, so a 10 Hz burst and a daily
+        // reading both have to come back with something.
+        for window in Self.tailWindows {
+            let range = end.addingTimeInterval(-window)...end.addingTimeInterval(1)
+            let page = try await fetchObservations(datastreamId: datastream.id,
+                                                   phenomenonTime: range,
+                                                   limit: max(limit, 50),
+                                                   format: Self.omJSON,
+                                                   decoder: decoder)
+            if page.observations.count >= limit || !page.observations.isEmpty {
+                return Array(page.observations
+                    .sorted { $0.phenomenonTime > $1.phenomenonTime }
+                    .prefix(limit))
+            }
+        }
+        return []
+    }
+
+    /// Tail windows, in seconds: five seconds, a minute, an hour, a day.
+    private static let tailWindows: [TimeInterval] = [5, 60, 3600, 86_400]
+
+    /// Parses a node timestamp with or without fractional seconds.
+    static func parseTimestamp(_ text: String) -> Date? {
+        isoFormatter.date(from: text) ?? isoPlainFormatter.date(from: text)
+    }
+
+    private static let isoPlainFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
     /// Fetches one page by URL — used to follow a `next` link.
     func fetchObservations(url: URL,
                            format: String = "application/om+json",
@@ -241,6 +308,31 @@ actor ConnectedSystemsReadClient {
         do {
             let data = try await get(url: url)
             let response: ItemsResponse<SystemSummary> = try decode(data, from: url)
+            return response.items
+        } catch ClientError.httpError(404) {
+            return []
+        }
+    }
+
+    // MARK: Control streams
+
+    /// Control streams of one system, listed only.
+    ///
+    /// Commanding is Pass 4. Listing them here is what lets the browser say
+    /// "3 control streams" instead of pretending a commandable camera is a
+    /// read-only one. The endpoint is `/controlstreams`; `/controls`
+    /// redirects, and this client refuses redirects on purpose.
+    ///
+    /// A node that models no commands answers 404, which is "none" rather than
+    /// an error worth failing a browse over.
+    func listControlStreams(systemId: String) async throws -> [ControlStreamSummary] {
+        let url = baseURL
+            .appendingPathComponent("systems")
+            .appendingPathComponent(systemId)
+            .appendingPathComponent("controlstreams")
+        do {
+            let data = try await get(url: url)
+            let response: ItemsResponse<ControlStreamSummary> = try decode(data, from: url)
             return response.items
         } catch ClientError.httpError(404) {
             return []
@@ -309,7 +401,7 @@ actor ConnectedSystemsReadClient {
     private func get(url: URL, accept: String = "application/json") async throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        if let authHeader { request.setValue(authHeader, forHTTPHeaderField: "Authorization") }
         request.setValue(accept, forHTTPHeaderField: "Accept")
 
         let (data, response) = try await session.data(for: request)

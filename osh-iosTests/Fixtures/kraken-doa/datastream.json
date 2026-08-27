@@ -1,0 +1,93 @@
+{
+  "id": "0g10",
+  "name": "KrakenSDR - DoA",
+  "system@id": "0g0g",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/0g0g?f=json",
+    "uid": "urn:osh:sensor:krakensdr:kraken002",
+    "type": "application/geo+json"
+  },
+  "outputName": "kraken_doa",
+  "validTime": [
+    "2026-06-23T16:21:44.786Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-06-23T16:23:42.564Z",
+    "2026-06-23T16:25:51.451Z"
+  ],
+  "resultTime": [
+    "2026-06-23T16:23:42.564Z",
+    "2026-06-23T16:25:51.451Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/AzimuthAngle",
+      "label": "Raw LOB",
+      "description": "The LOB to the emitter in absolute (true north) value"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/ConfidenceValue",
+      "label": "Confidence",
+      "description": "Confidence Value (0-99). The higher the better"
+    },
+    {
+      "definition": "http://qudt.org/vocab/quantitykind/SignalStrength",
+      "label": "RSSI",
+      "description": "Received Signal Strength Indicator value of the event"
+    },
+    {
+      "definition": "http://qudt.org/vocab/quantitykind/Frequency",
+      "label": "Frequency",
+      "description": "The transmission frequency of the event in Hertz"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/Latency",
+      "label": "Latency",
+      "description": "Latency in ms : (Time from signal arrival at antenna, to result. NOT including network latency.)"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/Identifier",
+      "label": "UUID",
+      "description": "Name of the KrakenSDR station inputted in the Station Information box in the Web GUI"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/LocationVector",
+      "label": "Location",
+      "description": "Lat and Long of the Kraken's Position"
+    }
+  ],
+  "resultType": "record",
+  "formats": [
+    "application/om+json",
+    "application/swe+json",
+    "application/swe+csv",
+    "application/swe+xml",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g10",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g10?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/0g0g?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/0g10/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

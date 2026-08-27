@@ -4,12 +4,14 @@ import Foundation
 //
 // Reads the captured node documents under osh-iosTests/Fixtures.
 //
-// Located from #filePath rather than from the test bundle. The fixture tree has
-// six folders each containing a "datastream.json" and a "schema-json.json", and
-// a synchronized Xcode group copies resources into the bundle root without
-// their directory structure — so bundle lookup would resolve every slug's
-// schema to whichever one won the name collision. Reading from the source tree
-// keeps each slug's documents distinct and keeps the fixtures diffable in git.
+// The tree is a FOLDER REFERENCE in the test target, so it is copied into the
+// bundle with its directory structure intact and adding a fixture needs no
+// project edit beyond the membership list that scripts/capture-fixtures.sh
+// regenerates. That structure is the point: seven folders each hold a
+// "schema-json.json", and a flat copy would collapse them onto one file.
+//
+// The bundle copy is preferred, with the source tree as a fallback so the
+// fixtures stay readable when a test runs outside a built bundle.
 
 enum FixtureLoader {
 
@@ -24,13 +26,30 @@ enum FixtureLoader {
         case choicePTZControl   = "choice-ptz-control"   // DataChoice (control stream)
     }
 
-    /// osh-iosTests/Fixtures, resolved from this file's own location.
-    static let root: URL = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .appendingPathComponent("Fixtures", isDirectory: true)
+    /// The fixture tree: the copy inside the test bundle when there is one,
+    /// otherwise the one in the source tree.
+    static let root: URL = {
+        let bundled = Bundle(for: BundleAnchor.self)
+            .bundleURL.appendingPathComponent("Fixtures", isDirectory: true)
+        if FileManager.default.fileExists(atPath: bundled.path) { return bundled }
+        return URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures", isDirectory: true)
+    }()
+
+    /// Exists only to give `Bundle(for:)` a class inside the test bundle.
+    private final class BundleAnchor {}
 
     static func directory(_ slug: Slug) -> URL {
         root.appendingPathComponent(slug.rawValue, isDirectory: true)
+    }
+
+    /// Fixture folders actually present on disk, so a test can assert over what
+    /// was captured rather than over a hardcoded list.
+    static var presentSlugs: [Slug] {
+        Slug.allCases.filter {
+            FileManager.default.fileExists(atPath: directory($0).path)
+        }
     }
 
     /// Raw bytes of one fixture file, or nil when that fixture was not captured

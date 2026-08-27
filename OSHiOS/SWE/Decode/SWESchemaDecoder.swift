@@ -75,8 +75,18 @@ enum SWESchemaDecoder {
         let record = asRecord(component, name: string(schemaObject["name"]))
 
         var encoding: DecodedBinaryEncoding?
-        if let encodingObject = root["recordEncoding"] as? [String: Any] {
+        if let encodingObject = (root["recordEncoding"] ?? root["paramsEncoding"]) as? [String: Any] {
             encoding = try decodeEncoding(encodingObject)
+        }
+
+        // When a non-record top level was wrapped, its encoding's refs are
+        // relative to the component, not to the wrapper: the Axis PTZ choice
+        // declares "/pan", while the decoded record puts that field at
+        // "/ptzControl/pan". Rebasing the refs here keeps the member table and
+        // the parser tree addressing the same paths.
+        if !(component is DataRecord) {
+            encoding = encoding.map { rebase($0, under: record.name) }
+            idIndex = idIndex.mapValues { FieldPath(components: [record.name] + $0.components) }
         }
 
         return DatastreamSchema(obsFormat: string(root["obsFormat"]) ?? "",
@@ -512,6 +522,19 @@ enum SWESchemaDecoder {
     /// description regardless of how the node wrote it.
     private static func normalise(ref: String) -> String {
         FieldPath(ref).description
+    }
+
+    /// Prefixes every member ref with `name`, for an encoding whose refs were
+    /// written relative to a top-level component that has since been wrapped.
+    private static func rebase(_ encoding: DecodedBinaryEncoding,
+                               under name: String) -> DecodedBinaryEncoding {
+        DecodedBinaryEncoding(
+            byteOrder: encoding.byteOrder,
+            byteEncoding: encoding.byteEncoding,
+            members: encoding.members.map {
+                BinaryMember(ref: FieldPath(components: [name] + FieldPath($0.ref).components).description,
+                             kind: $0.kind)
+            })
     }
 
     // MARK: Value helpers

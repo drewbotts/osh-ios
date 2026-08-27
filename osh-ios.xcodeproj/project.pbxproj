@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3A0OSHW00100000000000001 /* OSHiOSWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3A0OSHW00200000000000001 /* OSHiOSWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3A0OSHFIXBLD000000000001 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 3A0OSHFIXREF000000000001 /* Fixtures */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,12 +54,14 @@
 		3A38D78A2F74157B00D8BF3F /* osh-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "osh-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A38D7972F74157D00D8BF3F /* osh-iosTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "osh-iosTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A38D7A12F74157D00D8BF3F /* osh-iosUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "osh-iosUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3A0OSHFIXREF000000000001 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = "osh-iosTests/Fixtures"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		3A0OSHFIX00000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Fixtures/README.md,
 				Fixtures/ais-vessel-location/datastream.json,
 				Fixtures/ais-vessel-location/obs-binary.bin,
 				Fixtures/ais-vessel-location/obs-binary.index.json,
@@ -370,6 +373,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A0OSHFIXBLD000000000001 /* Fixtures in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

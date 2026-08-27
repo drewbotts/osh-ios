@@ -456,7 +456,9 @@ actor ConnectedSystemsClient {
     ///   [8 bytes] big-endian Double  — Unix wall-clock timestamp
     ///   [4 bytes] big-endian UInt32  — byte length of the compressed frame
     ///   [N bytes] compressed frame   — H264 Annex-B or JPEG bytes
-    nonisolated private func buildBinaryObsBody(timestamp: Double, frame: Data) -> Data {
+    // Internal rather than private so the round-trip tests can prove the
+    // decoder is this function's exact inverse. Behaviour is unchanged.
+    nonisolated func buildBinaryObsBody(timestamp: Double, frame: Data) -> Data {
         var ts  = timestamp.bitPattern.bigEndian
         var len = UInt32(frame.count).bigEndian
         var body = Data(bytes: &ts,  count: 8)

@@ -285,7 +285,7 @@ struct SWEParserTree: Sendable {
             case .int:    value = .int(try source.readInt(at: readPath))
             case .bool:   value = .bool(try source.readBool(at: readPath))
             case .text:   value = .text(try source.readString(at: readPath))
-            case .time:   value = .time(try source.readTime(at: readPath))
+            case .time:   value = .time(try time(at: readPath, source: &source))
             case .block:
                 let (data, compression) = try source.readBlock(at: readPath)
                 value = .block(data, compression: compression)
@@ -318,6 +318,51 @@ struct SWEParserTree: Sendable {
             record(.text(itemNames[selected]), at: choicePath, values: &values, paths: &paths)
             try walk(items[selected], prefix: prefix,
                      source: &source, values: &values, paths: &paths)
+        }
+    }
+
+    /// Reads a Time leaf, falling back to the envelope.
+    ///
+    /// om+json omits the record's own Time field from `result` for some of the
+    /// node's drivers — gps and spectrum send only `location`/`channel`… and
+    /// leave the instant to the envelope's phenomenonTime — while others repeat
+    /// it inside the result. A missing Time is therefore ordinary rather than
+    /// malformed, and the envelope is the value the node meant.
+    ///
+    /// Only Time behaves this way. Any other missing leaf still throws: a
+    /// silently absent measurement would be indistinguishable from a real zero.
+    private func time(at path: FieldPath, source: inout any TokenSource) throws -> Date {
+        do {
+            return try source.readTime(at: path)
+        } catch let error as TokenSourceError {
+            guard case .missingValue = error, let external = source.externalTime else {
+                throw error
+            }
+            return external
+        }
+    }
+
+    /// Leaf paths as a binary encoding writes them — array elements addressed
+    /// by their element type's name rather than by index, because that is how a
+    /// node writes the single member describing them.
+    var encodingLeafPaths: [FieldPath] {
+        var paths: [FieldPath] = []
+        Self.collectEncodingPaths(root, into: &paths)
+        return paths
+    }
+
+    private static func collectEncodingPaths(_ node: ParserNode, into paths: inout [FieldPath]) {
+        switch node {
+        case .record(_, let children), .vector(_, let children):
+            for child in children { collectEncodingPaths(child, into: &paths) }
+        case .choice(_, _, _, let items):
+            for item in items { collectEncodingPaths(item, into: &paths) }
+        case .array(_, _, _, let element):
+            collectEncodingPaths(element, into: &paths)
+        case .blockArray(_, let path):
+            paths.append(path)
+        case .scalar(let path, _):
+            paths.append(path)
         }
     }
 

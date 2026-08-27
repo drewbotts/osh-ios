@@ -263,7 +263,9 @@ struct SWEParserTreeTests {
         var source: any TokenSource = BinaryTokenSource(data: full.prefix(20), encoding: encoding)
         source.beginRecord()
 
-        #expect(throws: TokenSourceError.self) {
+        // The path is what makes a node-side framing change diagnosable, so
+        // the error must carry one rather than being a bare "bad data".
+        #expect(throws: SWEDecodeError.self) {
             try tree.decodeRecord(from: &source, datastreamId: "ais")
         }
     }

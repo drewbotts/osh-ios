@@ -18,16 +18,18 @@
 set -uo pipefail
 
 OSH_NODE="${OSH_NODE:-}"
-if [[ -z "$OSH_NODE" ]]; then
-  echo "error: OSH_NODE is not set" >&2
-  exit 2
-fi
 OSH_NODE="${OSH_NODE%/}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURE_ROOT="$REPO_ROOT/osh-iosTests/Fixtures"
 
 MODE="${1:-survey}"
+
+# Only the modes that talk to a node need one; "sync" is purely local.
+if [[ "$MODE" != "sync" && -z "$OSH_NODE" ]]; then
+  echo "error: OSH_NODE is not set" >&2
+  exit 2
+fi
 
 # Export for the embedded python3 programs. OSH_TEST_USER/OSH_TEST_PASS are
 # already in the environment when set; python reads them directly and puts them
@@ -355,6 +357,15 @@ PY
 
 case "$MODE" in
   survey)  do_survey ;;
-  capture) do_capture ;;
-  *) echo "usage: $0 [survey|capture]" >&2; exit 2 ;;
+  capture)
+    do_capture
+    echo
+    echo "Syncing Xcode project"
+    # New fixture files must be listed in the test target's membership
+    # exceptions or the synchronized folder group flattens them into the
+    # bundle root; see the script's own docstring.
+    python3 "$REPO_ROOT/scripts/sync-fixture-membership.py"
+    ;;
+  sync)    python3 "$REPO_ROOT/scripts/sync-fixture-membership.py" ;;
+  *) echo "usage: $0 [survey|capture|sync]" >&2; exit 2 ;;
 esac

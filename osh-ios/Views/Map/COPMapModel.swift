@@ -2,9 +2,12 @@ import Foundation
 import CoreLocation
 import Combine
 
-// MARK: - NodeMapModel
+// MARK: - COPMapModel
 //
-// Every system on the node that says where it is, on one map.
+// Every system on the node that says where it is, on one map — the node half of
+// the common operating picture. This device's own track and fix are added by
+// the view, from SensorSession, so the phone keeps drawing itself whether or
+// not a node is configured, reachable or interesting.
 //
 // Three things are genuinely hard here and all three are about restraint.
 //
@@ -20,21 +23,33 @@ import Combine
 //
 // And a line of bearing is never removed. Direction finding emits only on
 // detection; a LOB from an hour ago is the answer to "which way was it", and
-// clearing it after a timeout would delete the only thing on screen.
+// clearing it after a timeout would delete the only thing on screen. A target
+// designation is the same kind of event and keeps the same rule.
 
 @MainActor
-final class NodeMapModel: ObservableObject {
+final class COPMapModel: ObservableObject {
 
     // MARK: Configuration
 
     /// How many systems hold a live subscription at once.
     static let maxLiveSystems = 5
 
-    /// How many markers are drawn before the oldest are dropped.
+    /// How many markers are built before the oldest are dropped, with grouping
+    /// switched off.
     ///
-    /// SwiftUI's Map has no clustering on this deployment target, so the choice
-    /// is decimation or a map that stops responding in a busy anchorage.
+    /// Decimation is the last resort and it is a lie by omission: the hundred
+    /// newest vessels in a busy anchorage look exactly like all of them. It is
+    /// kept only for the ungrouped case, where every marker really is its own
+    /// annotation and the map stops responding somewhere above this.
     static let maxMarkers = 100
+
+    /// The budget when markers are grouped.
+    ///
+    /// Four times higher because clustering breaks the link between markers
+    /// held and annotations drawn: a thousand vessels in one anchorage become a
+    /// handful of bubbles, and the only per-marker cost left is the clustering
+    /// pass itself, which is one comparison each.
+    static let maxClusteredMarkers = 400
 
     /// Systems loaded at once when the tab appears.
     static let loadConcurrency = 4
@@ -50,14 +65,42 @@ final class NodeMapModel: ObservableObject {
     /// markers on every observation, for a map nobody can read at that rate.
     @Published private(set) var markers: [SystemMapView.Marker] = []
     @Published private(set) var bearingLines: [SystemMapView.BearingLine] = []
+    /// One line per designated target, from its source's *current* position.
+    @Published private(set) var targetLines: [SystemMapView.TargetLine] = []
+    /// Past targets, built only while the history layer is on.
+    @Published private(set) var targetHistory: [SystemMapView.TargetDot] = []
     /// True when more entities were found than `maxMarkers`.
     @Published private(set) var didDecimate = false
 
-    @Published var isLive = true {
-        didSet { Task { await applyLiveMode() } }
+    /// Freshness snapshot, refreshed when the tracker publishes.
+    ///
+    /// Copied into the model rather than read by each marker: a hundred
+    /// annotations each observing the tracker would redraw the whole map
+    /// whenever any one system changed colour.
+    private var activityStates: [String: ActivityState] = [:]
+
+    /// Which layers to draw. The view keeps this in step with AppConfig.
+    @Published var layers = MapLayers() {
+        didSet {
+            guard oldValue != layers else { return }
+            if oldValue.liveUpdates != layers.liveUpdates {
+                Task { await applyLiveMode() }
+            } else {
+                refreshAnnotations()
+            }
+        }
     }
 
+    /// This device as a source candidate. Supplied by the view, which is what
+    /// owns the sensor session, and refreshed as the phone moves.
+    private(set) var localDevice: TargetSourceResolver.LocalDeviceRef?
+
+    /// (datastream, source) pairs already reported as unlocatable, so a target
+    /// whose observer nothing can place says so once rather than at 2.5 Hz.
+    private var loggedSourcelessTargets: Set<String> = []
+
     private let loader = RemoteSystemLoader()
+    private var activityObserver: AnyCancellable?
     private var sessions: [String: SystemLiveSession] = [:]
     private var sessionObservers: [String: AnyCancellable] = [:]
     /// systemId → datastreamId → the one archived observation, for static mode.
@@ -69,6 +112,17 @@ final class NodeMapModel: ObservableObject {
     /// How often the annotations are rebuilt while streams are running.
     private static let refreshInterval: Duration = .milliseconds(400)
 
+    // MARK: This device
+
+    /// Tells the model where this device is, for target lines whose source is
+    /// the phone itself. A no-op when nothing changed, so the caller can pass
+    /// it on every fix.
+    func setLocalDevice(_ device: TargetSourceResolver.LocalDeviceRef?) {
+        guard device != localDevice else { return }
+        localDevice = device
+        scheduleRefresh()
+    }
+
     // MARK: Loading
 
     func load(connection: NodeConnection?, refresh: Bool = false) async {
@@ -76,7 +130,7 @@ final class NodeMapModel: ObservableObject {
         guard let connection else {
             stopAll()
             systems = []
-            error = "Select a server on the Node tab first."
+            error = "Select a server on the Systems tab first."
             return
         }
 
@@ -85,10 +139,17 @@ final class NodeMapModel: ObservableObject {
 
         if refresh { await loader.invalidate(serverId: connection.server.id) }
 
+        observeActivity()
+
         do {
             let summaries = try await connection.readClient.listSystems(limit: 200)
-            systems = await loadSystems(summaries, connection: connection, refresh: refresh)
+            systems = await loader.loadAll(summaries,
+                                           using: connection.readClient,
+                                           serverId: connection.server.id,
+                                           refresh: refresh,
+                                           concurrency: Self.loadConcurrency)
             error = nil
+            seedActivity(serverId: connection.server.id)
             refreshAnnotations()
             await applyLiveMode()
             refreshAnnotations()
@@ -98,35 +159,53 @@ final class NodeMapModel: ObservableObject {
         }
     }
 
-    private func loadSystems(_ summaries: [SystemSummary],
-                             connection: NodeConnection,
-                             refresh: Bool) async -> [RemoteSystem] {
+    // MARK: Activity
 
-        let loader = self.loader
-        let client = connection.readClient
-        let serverId = connection.server.id
-        var result: [Int: RemoteSystem] = [:]
-
-        await withTaskGroup(of: (Int, RemoteSystem?).self) { group in
-            var next = 0
-            func add(_ index: Int) {
-                let id = summaries[index].id
-                group.addTask {
-                    let outcome = await loader.load(systemId: id, using: client,
-                                                    serverId: serverId, refresh: refresh)
-                    if case .success(let system) = outcome { return (index, system) }
-                    return (index, nil)
-                }
-            }
-            while next < summaries.count && next < Self.loadConcurrency {
-                add(next); next += 1
-            }
-            while let (index, system) = await group.next() {
-                result[index] = system
-                if next < summaries.count { add(next); next += 1 }
-            }
+    /// Seeds the tracker from what the node reported at load, so a system that
+    /// is not subscribed still shows an honest colour.
+    private func seedActivity(serverId: UUID) {
+        for system in systems {
+            ActivityTracker.shared.seed(system.activity,
+                                        serverId: serverId,
+                                        systemId: system.id)
         }
-        return summaries.indices.compactMap { result[$0] }
+        captureActivity(serverId: serverId)
+    }
+
+    /// Follows the tracker so a system decaying to amber redraws its marker.
+    ///
+    /// The tracker publishes only on a genuine state change or on its 30 s
+    /// re-evaluation, so this is a handful of refreshes a minute rather than
+    /// one per observation.
+    private func observeActivity() {
+        guard activityObserver == nil else { return }
+        activityObserver = ActivityTracker.shared.objectWillChange
+            .sink { [weak self] _ in self?.scheduleRefresh() }
+    }
+
+    private func captureActivity(serverId: UUID) {
+        var states: [String: ActivityState] = [:]
+        for system in systems {
+            states[system.id] = ActivityTracker.shared.state(serverId: serverId,
+                                                             systemId: system.id)
+        }
+        activityStates = states
+    }
+
+    /// How many markers may be built before the oldest are dropped.
+    var markerBudget: Int {
+        layers.clusterMarkers ? Self.maxClusteredMarkers : Self.maxMarkers
+    }
+
+    /// Freshness of one system, for its marker.
+    func activityState(_ systemId: String) -> ActivityState {
+        activityStates[systemId] ?? .offline
+    }
+
+    /// The full activity of one system, for a sheet or a detail row.
+    func activity(for system: RemoteSystem) -> SystemActivity {
+        guard let serverId = connection?.server.id else { return system.activity }
+        return ActivityTracker.shared.activity(serverId: serverId, systemId: system.id)
     }
 
     // MARK: Live subscriptions
@@ -135,7 +214,7 @@ final class NodeMapModel: ObservableObject {
     private func applyLiveMode() async {
         guard let connection else { return }
 
-        guard isLive else {
+        guard layers.liveUpdates else {
             stopAll()
             await fetchArchivedPositions(connection: connection)
             refreshAnnotations()
@@ -143,6 +222,7 @@ final class NodeMapModel: ObservableObject {
         }
 
         let wanted = Set(liveCandidates().map(\.id))
+
         for id in sessions.keys where !wanted.contains(id) {
             sessions[id]?.stop()
             sessions[id] = nil
@@ -154,11 +234,7 @@ final class NodeMapModel: ObservableObject {
             // Only the streams that move a marker or draw a line. A dashboard
             // opens everything; a map has no use for a settings dump beyond the
             // position inside it, and none at all for a spectrum.
-            let ids = Set(system.datastreams.filter { datastream in
-                if case .location = datastream.role { return true }
-                if case .bearing = datastream.role { return true }
-                return datastream.embeddedPosition != nil
-            }.map(\.id))
+            let ids = Set(system.datastreams.filter(Self.drawsOnMap).map(\.id))
             guard !ids.isEmpty else { continue }
 
             sessions[system.id] = session
@@ -173,16 +249,28 @@ final class NodeMapModel: ObservableObject {
         refreshAnnotations()
     }
 
+    /// Whether a datastream puts anything on the map.
+    ///
+    /// One predicate rather than three copies: it decides which streams get a
+    /// subscription, which get an archived fetch, and — by omission — which a
+    /// map has no use for. A settings dump qualifies only for the position
+    /// inside it; a spectrum never does.
+    static func drawsOnMap(_ datastream: RemoteDatastream) -> Bool {
+        switch datastream.role {
+        case .location, .bearing, .target: return true
+        default:                            return datastream.embeddedPosition != nil
+        }
+    }
+
     /// The systems worth subscribing to: those with something that moves,
     /// freshest first, cut at the cap.
     private func liveCandidates() -> [RemoteSystem] {
         systems
             .filter { system in
-                system.hasPosition && system.datastreams.contains { datastream in
-                    if case .location = datastream.role { return true }
-                    if case .bearing = datastream.role { return true }
-                    return datastream.embeddedPosition != nil
-                }
+                guard system.datastreams.contains(where: Self.drawsOnMap) else { return false }
+                // A range finder has no position of its own and still belongs
+                // on the map: what it draws is out where it was pointing.
+                return system.hasPosition || !system.targetDatastreams.isEmpty
             }
             .sorted { Self.freshness($0) > Self.freshness($1) }
             .prefix(Self.maxLiveSystems)
@@ -210,11 +298,8 @@ final class NodeMapModel: ObservableObject {
         let client = connection.readClient
 
         for system in systems where !live.contains(system.id) {
-            let relevant = system.datastreams.filter { datastream in
-                guard datastream.decoder != nil else { return false }
-                if case .location = datastream.role { return true }
-                if case .bearing = datastream.role { return true }
-                return datastream.embeddedPosition != nil
+            let relevant = system.datastreams.filter {
+                $0.decoder != nil && Self.drawsOnMap($0)
             }
             guard !relevant.isEmpty else { continue }
 
@@ -259,10 +344,34 @@ final class NodeMapModel: ObservableObject {
     }
 
     func refreshAnnotations() {
+        if let serverId = connection?.server.id { captureActivity(serverId: serverId) }
         let built = buildMarkers()
         markers = built.markers
         didDecimate = built.decimated
         bearingLines = buildBearingLines()
+        let targets = buildTargetOverlays()
+        targetLines = targets.lines
+        targetHistory = targets.history
+    }
+
+    // MARK: Target sources
+
+    /// Where a node system is *now*, for a target line's origin.
+    ///
+    /// Deliberately the same answer the system's own marker gets — live beats
+    /// reported beats deployed, via `PositionKind` — so a line always starts
+    /// exactly where the source is drawn, and follows it when it moves.
+    func currentPosition(of system: RemoteSystem) -> CLLocationCoordinate2D? {
+        markers(for: system).first?.coordinate
+    }
+
+    /// Says once, at debug, that a target's observer could not be placed.
+    func noteSourceWithoutPosition(datastreamId: String,
+                                   source: TargetSourceResolver.SourceRef) {
+        let key = "\(datastreamId)|\(source.systemId)"
+        guard !loggedSourcelessTargets.contains(key) else { return }
+        loggedSourcelessTargets.insert(key)
+        Log.client.debug("Target stream \(datastreamId, privacy: .public): source \(source.name, privacy: .public) (\(source.resolution.rawValue, privacy: .public)) has no position; drawing the target marker only")
     }
 
     // MARK: Reading
@@ -286,31 +395,5 @@ final class NodeMapModel: ObservableObject {
         observations(systemId: systemId, datastreamId: datastreamId)
             .max { $0.observation.phenomenonTime < $1.observation.phenomenonTime }?
             .observation
-    }
-}
-
-// MARK: - ISO8601DateFormatter
-
-extension ISO8601DateFormatter {
-    /// Parses the node's timestamps whether or not they carry fractional
-    /// seconds. One formatter refuses the other's output, and the node emits
-    /// both.
-    ///
-    /// nonisolated(unsafe): formatOptions are set once and never mutated, and
-    /// Foundation documents date(from:) as safe for concurrent use.
-    nonisolated(unsafe) static let flexible: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    nonisolated(unsafe) static let plain: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
-    static func parse(_ text: String) -> Date? {
-        flexible.date(from: text) ?? plain.date(from: text)
     }
 }

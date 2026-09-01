@@ -169,5 +169,7 @@ extension View {
             .environmentObject(AppSettingsStore())
             .environmentObject(NodeConnectionStore())
             .environmentObject(SensorSession())
+            .environmentObject(ActivityTracker.shared)
+            .environmentObject(TabRouter())
     }
 }

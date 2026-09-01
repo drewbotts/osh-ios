@@ -68,6 +68,47 @@ actor RemoteSystemLoader {
         }
     }
 
+    /// Loads a whole listing, at most `concurrency` systems at once.
+    ///
+    /// Three surfaces now want every system on a node at once — the COP map,
+    /// the video wall and the systems list — and each of them had grown its own
+    /// copy of this task-group. Shared so that "how many schema fetches does
+    /// opening a tab cost" has one answer.
+    ///
+    /// Systems that fail to load are dropped rather than represented: a listing
+    /// entry with nothing behind it can neither be drawn on a map nor opened,
+    /// and the per-system failure is already in the log.
+    func loadAll(_ summaries: [SystemSummary],
+                 using client: ConnectedSystemsReadClient,
+                 serverId: UUID,
+                 refresh: Bool = false,
+                 concurrency: Int = 4) async -> [RemoteSystem] {
+
+        var result: [Int: RemoteSystem] = [:]
+
+        await withTaskGroup(of: (Int, RemoteSystem?).self) { group in
+            var next = 0
+            func add(_ index: Int) {
+                let id = summaries[index].id
+                group.addTask {
+                    let outcome = await self.load(systemId: id, using: client,
+                                                  serverId: serverId, refresh: refresh)
+                    if case .success(let system) = outcome { return (index, system) }
+                    return (index, nil)
+                }
+            }
+            while next < summaries.count && next < concurrency {
+                add(next); next += 1
+            }
+            while let (index, system) = await group.next() {
+                result[index] = system
+                if next < summaries.count { add(next); next += 1 }
+            }
+        }
+        // Listing order, which is the order the node meant.
+        return summaries.indices.compactMap { result[$0] }
+    }
+
     /// Drops every cached system for one server — after a credential change,
     /// or when the user asks for a full refresh of a listing.
     func invalidate(serverId: UUID) {
@@ -85,7 +126,7 @@ actor RemoteSystemLoader {
         // These three are independent of each other and of the schemas, and all
         // three tolerate absence, so they run together and none can fail the load.
         async let subsystems = (try? await client.listSubsystems(systemId: systemId)) ?? []
-        async let controlStreams = Self.controlStreamCount(systemId: systemId, client: client)
+        async let controlStreams = Self.controlStreams(systemId: systemId, client: client)
         async let fixedLocation = try? await client.getSystemLocation(systemId: systemId)
 
         let datastreams = await resolveDatastreams(datastreamSummaries, using: client)
@@ -93,7 +134,7 @@ actor RemoteSystemLoader {
         return RemoteSystem(summary: summary,
                             subsystems: await subsystems,
                             datastreams: datastreams,
-                            controlStreamCount: await controlStreams,
+                            controlStreams: await controlStreams,
                             fixedLocation: await fixedLocation ?? nil)
     }
 
@@ -153,12 +194,45 @@ actor RemoteSystemLoader {
         }
     }
 
-    /// `GET /systems/{id}/controlstreams`, with 404 read as "none".
+    /// `GET /systems/{id}/controlstreams`, each with its parameters schema.
     ///
     /// A node that models no commands answers 404 rather than an empty
-    /// collection, exactly as it does for subsystems.
-    private static func controlStreamCount(systemId: String,
-                                           client: ConnectedSystemsReadClient) async -> Int {
-        (try? await client.listControlStreams(systemId: systemId).count) ?? 0
+    /// collection, exactly as it does for subsystems, so the whole listing
+    /// degrades to "none" rather than failing the load.
+    ///
+    /// The schemas are fetched together for the same reason the datastream ones
+    /// are: a camera with a PTZ control stream needs its DataChoice decoded
+    /// before the video wall can decide whether to draw a D-pad over it, and a
+    /// second round trip at that moment would show the controls a beat late.
+    /// There are rarely more than one or two, so this is not throttled.
+    private static func controlStreams(systemId: String,
+                                       client: ConnectedSystemsReadClient) async
+        -> [RemoteControlStream] {
+
+        guard let summaries = try? await client.listControlStreams(systemId: systemId),
+              !summaries.isEmpty else { return [] }
+
+        var resolved: [Int: RemoteControlStream] = [:]
+        await withTaskGroup(of: (Int, RemoteControlStream).self) { group in
+            for (index, summary) in summaries.enumerated() {
+                group.addTask { (index, await resolve(summary, using: client)) }
+            }
+            for await (index, stream) in group { resolved[index] = stream }
+        }
+        return summaries.indices.compactMap { resolved[$0] }
+    }
+
+    private static func resolve(_ summary: ControlStreamSummary,
+                                using client: ConnectedSystemsReadClient) async
+        -> RemoteControlStream {
+        do {
+            let data = try await client.getControlSchemaJSON(controlStreamId: summary.id)
+            return RemoteControlStream(summary: summary,
+                                       schema: try SWESchemaDecoder.decode(data))
+        } catch {
+            let message = error.localizedDescription
+            Log.client.error("Control schema for \(summary.id, privacy: .public) (\(summary.inputName ?? "?", privacy: .public)) not understood: \(message, privacy: .public)")
+            return RemoteControlStream(summary: summary, schemaError: message)
+        }
     }
 }

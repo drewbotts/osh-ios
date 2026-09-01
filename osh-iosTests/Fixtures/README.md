@@ -35,7 +35,9 @@ unmodified.
 | `obs-binary.bin` | three messages, concatenated |
 | `obs-binary.index.json` | each message's byte length, and where it came from |
 | `system.json` | `GET /systems/{id}` |
-| `subsystems.json` | `GET /systems/{id}/subsystems`, only when non-empty |
+| `subsystems.json` | `GET /systems/{id}/subsystems`, only when non-empty — or always, for a slug with related systems |
+| `source-system.json` | `GET /systems/{id}` for a second system the fixture is *about*, e.g. the phone an LRF is carried by |
+| `source-subsystems.json` | that second system's subsystems, empty or not |
 | `controlstreams.json` | `GET /systems/{id}/controlstreams` |
 | `control-schema.json` | `GET /controlstreams/{id}/schema?commandFormat=…` |
 
@@ -61,11 +63,22 @@ successive `limit=N` responses because the datastream is archive-only.
 | `kraken-settings` | KrakenSDR settings | deeply nested DataRecord; a position at `/stationConfig/location` with a heading beside it |
 | `kraken-doa` | KrakenSDR DoA | a line of bearing with a confidence figure, and the station's own position stamped on every record |
 | `choice-ptz-control` | Axis ptzControl | the node's only DataChoice; seeds Pass 4 |
+| `lrf-target` | TruPulse 360 targetLoc | a location vector that is *not* the system's position — the shape the `.target` role exists for |
+| `lrf-range` | TruPulse 360 rangeData | an azimuth and two distances with no location vector: must stay a `.bearing` |
 
 ## Not represented on this node
 
-- **Subsystems.** All eleven systems answer `/subsystems` with an empty
-  collection and none carries a parent link, so no `subsystems.json` exists.
+- **Subsystems.** Every system answers `/subsystems` with an empty collection
+  and none carries a parent link. The `lrf-*` folders capture that emptiness
+  deliberately — see below — and no other folder has a `subsystems.json`.
+
+- **Any stated relationship between two systems.** The range finder and the
+  phone carrying it are two peer registrations: no parent link either way, no
+  subsystem entry, and nothing in the target record naming the phone. The
+  sixteen-character device id shared by their UIDs is the only connection, which
+  is why `TargetSourceResolver` has a fourth rule that reads UIDs. `lrf-target`
+  captures all four documents — both registrations and both empty subsystem
+  collections — so that absence is under test.
 - **A DataChoice with messages.** The PTZ control stream has zero archived
   commands, so the binary choice-selector layout could not be verified against
   real bytes. See `OSHiOS/SWE/Decode/BINARY_FORMAT.md`.

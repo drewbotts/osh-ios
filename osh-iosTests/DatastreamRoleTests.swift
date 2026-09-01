@@ -135,6 +135,45 @@ struct DatastreamRoleTests {
         #expect(EntityKeyInference.entityKeyPath(schema: decoded.recordSchema, role: role) == nil)
     }
 
+    @Test("The laser range finder's target output is a target, not a location")
+    func lrfTargetIsTarget() throws {
+        let decoded = try Self.schema(.lrfTarget)
+        let role = try Self.role(.lrfTarget)
+
+        guard case .target(let paths) = role else {
+            Issue.record("expected .target, got \(role)")
+            return
+        }
+        #expect(paths.location.latitude.description == "/location/lat")
+        #expect(paths.location.longitude.description == "/location/lon")
+        #expect(paths.location.altitude?.description == "/location/alt")
+
+        // The reference node splits the range finder's output in two: the point
+        // here, the numbers on a sibling datastream. So every one of these is
+        // nil, and the card and the marker have to cope with that.
+        #expect(paths.range == nil)
+        #expect(paths.azimuth == nil)
+        #expect(paths.elevation == nil)
+        #expect(paths.sourceIdPath == nil)
+
+        // The whole point of the role. Treating the target's coordinates as an
+        // embedded position would pin the range finder on top of the thing it
+        // was pointing at, which is the bug this fixes.
+        #expect(RemoteDatastream.embeddedPosition(in: decoded.recordSchema, role: role) == nil)
+    }
+
+    @Test("The same range finder's range output stays a bearing")
+    func lrfRangeIsBearing() throws {
+        let role = try Self.role(.lrfRange)
+        guard case .bearing(let paths) = role else {
+            Issue.record("expected .bearing, got \(role)")
+            return
+        }
+        // An azimuth and two distances, and no location vector anywhere: rule 2
+        // must not fire, and rule 5 must.
+        #expect(paths.angle.description == "/azimuth")
+    }
+
     @Test("MJPEG video is video, with the node's compression code")
     func videoIsVideo() throws {
         #expect(try Self.role(.videoMJPEG) == .video(compression: "JPEG"))
@@ -274,6 +313,104 @@ struct DatastreamRoleTests {
                                     DataField(name: "note", component: SWEText(label: "Note"))
                                 ])
         #expect(DatastreamRoleInference.role(schema: schema) == .generic)
+    }
+
+    // MARK: Target detection, and what it must not swallow
+
+    /// A record whose location vector says nothing about targets but which
+    /// carries a range beside it. The sibling range is the second half of
+    /// rule 2, and this is the shape it exists for.
+    @Test("A location vector with a range beside it is a target")
+    func syntheticTargetByRange() {
+        let schema = DataRecord(
+            definition: "http://sensorml.com/ont/swe/property/RangeFinderOutput",
+            label: "Designation", name: "designation",
+            fields: [
+                DataField(name: "time", component: TimeStamp()),
+                DataField(name: "observerUid", component: SWEText(
+                    definition: "http://sensorml.com/ont/swe/property/SourceSystemUID",
+                    label: "Source System UID")),
+                DataField(name: "location", component: SWEVector(
+                    definition: "http://sensorml.com/ont/swe/property/PointLocation",
+                    label: "Point",
+                    coordinates: [
+                        DataField(name: "lat", component: Quantity(
+                            definition: "http://sensorml.com/ont/swe/property/GeodeticLatitude",
+                            label: "Lat", uom: "deg")),
+                        DataField(name: "lon", component: Quantity(
+                            definition: "http://sensorml.com/ont/swe/property/Longitude",
+                            label: "Lon", uom: "deg"))
+                    ])),
+                DataField(name: "slantRange", component: Quantity(
+                    definition: "http://qudt.org/vocab/quantitykind/Distance",
+                    label: "Slant Range", uom: "m")),
+                DataField(name: "azimuth", component: Quantity(
+                    definition: "http://sensorml.com/ont/swe/property/AzimuthAngle",
+                    label: "Azimuth", uom: "deg")),
+                DataField(name: "inclination", component: Quantity(
+                    definition: "http://sensorml.com/ont/swe/property/ElevationAngle",
+                    label: "Inclination", uom: "deg"))
+            ])
+
+        guard case .target(let paths) = DatastreamRoleInference.role(schema: schema) else {
+            Issue.record("expected .target")
+            return
+        }
+        #expect(paths.range?.description == "/slantRange")
+        #expect(paths.azimuth?.description == "/azimuth")
+        #expect(paths.elevation?.description == "/inclination")
+        #expect(paths.sourceIdPath?.description == "/observerUid")
+    }
+
+    /// The exclusion that keeps direction finding working. A record with an
+    /// azimuth and no location vector is a line of bearing, and rule 2 running
+    /// first must not change that.
+    @Test("A record with an azimuth but no location vector is a bearing, not a target")
+    func syntheticAzimuthWithoutLocationIsBearing() {
+        let schema = DataRecord(
+            definition: "http://sensorml.com/ont/swe/property/doaOutput",
+            label: "DoA", name: "doa",
+            fields: [
+                DataField(name: "time", component: TimeStamp()),
+                DataField(name: "azimuth", component: Quantity(
+                    definition: "http://sensorml.com/ont/swe/property/AzimuthAngle",
+                    label: "Azimuth", uom: "deg")),
+                DataField(name: "slantRange", component: Quantity(
+                    definition: "http://qudt.org/vocab/quantitykind/Distance",
+                    label: "Slant Range", uom: "m")),
+                DataField(name: "confidence", component: Quantity(
+                    definition: "http://sensorml.com/ont/swe/property/ConfidenceValue",
+                    label: "Confidence", uom: "1"))
+            ])
+
+        guard case .bearing(let paths) = DatastreamRoleInference.role(schema: schema) else {
+            Issue.record("expected .bearing, got \(DatastreamRoleInference.role(schema: schema))")
+            return
+        }
+        #expect(paths.angle.description == "/azimuth")
+    }
+
+    /// "range" is five characters, so a substring match finds it inside
+    /// "AntennaArrangement". KrakenSDR's settings record has exactly that field
+    /// two levels from a location vector, and the target rule must not fire.
+    @Test("Adding the target rule changes no other fixture's role")
+    func targetRuleChangesNothingElse() throws {
+        #expect(try Self.role(.gps).label == "location")
+        #expect(try Self.role(.aisVesselLocation).label == "location")
+        #expect(try Self.role(.krakenDOA).label == "bearing")
+        #expect(try Self.role(.krakenSettings).label == "status")
+        #expect(try Self.role(.weather).label == "timeseries")
+        #expect(try Self.role(.spectrumArray).label == "chart")
+        #expect(try Self.role(.videoMJPEG).label == "video")
+
+        // And the DOA paths themselves, since the Kraken line on the map is
+        // drawn from them.
+        guard case .bearing(let doa) = try Self.role(.krakenDOA) else {
+            Issue.record("Kraken DOA is no longer a bearing")
+            return
+        }
+        #expect(doa.angle.description == "/raw_lob")
+        #expect(doa.quality?.description == "/confidence")
     }
 
     // MARK: Quaternion heading extraction

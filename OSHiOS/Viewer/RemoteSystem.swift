@@ -76,12 +76,58 @@ struct RemoteDatastream: Identifiable, Sendable {
     ///
     /// nil for a `.location` stream: there the position *is* the role, and
     /// duplicating it would give the map two sources for one marker.
+    ///
+    /// nil for a `.target` stream too, and for a stronger reason. The
+    /// coordinates in a range finder's record belong to the thing it is
+    /// pointing at, and treating them as an embedded position would pin the
+    /// range finder on top of its own target — which is exactly the bug the
+    /// `.target` role exists to fix.
     static func embeddedPosition(in record: DataRecord,
                                  role: DatastreamRole) -> EmbeddedPosition? {
         if case .location = role { return nil }
+        if case .target = role { return nil }
         guard let resolved = LocationPaths.resolveDetailed(in: record) else { return nil }
         return EmbeddedPosition(location: resolved.paths,
                                 headingPath: HeadingPath.resolve(in: record, near: resolved))
+    }
+}
+
+// MARK: - RemoteControlStream
+
+/// One control stream, resolved far enough to command.
+///
+/// The same shape as RemoteDatastream and for the same reason: a control stream
+/// whose schema will not decode is still listed, still nameable and still worth
+/// showing, because "this camera accepts commands the app cannot read" is a
+/// fact and an empty screen is not.
+struct RemoteControlStream: Identifiable, Sendable {
+
+    let summary: ControlStreamSummary
+    let schema: SWESchemaDecoder.DatastreamSchema?
+    /// Non-nil when the node's schema could not be read.
+    let schemaError: String?
+    /// Non-nil when the parameters describe a pan/tilt/zoom camera.
+    let ptz: PTZCapability?
+
+    var id: String { summary.id }
+    var name: String { summary.name }
+
+    /// The parameters a command carries, as a record.
+    var paramsSchema: DataRecord? { schema?.recordSchema }
+
+    init(summary: ControlStreamSummary, schema: SWESchemaDecoder.DatastreamSchema) {
+        self.summary = summary
+        self.schema = schema
+        self.schemaError = nil
+        self.ptz = PTZCapability.detect(in: schema.recordSchema,
+                                        controlStreamId: summary.id)
+    }
+
+    init(summary: ControlStreamSummary, schemaError: String) {
+        self.summary = summary
+        self.schema = nil
+        self.schemaError = schemaError
+        self.ptz = nil
     }
 }
 
@@ -93,12 +139,27 @@ struct RemoteSystem: Identifiable, Sendable {
     let summary: SystemSummary
     let subsystems: [SystemSummary]
     let datastreams: [RemoteDatastream]
-    let controlStreamCount: Int
+    let controlStreams: [RemoteControlStream]
     /// Where the system resource itself says it is — a deployment, not a fix.
     let fixedLocation: CLLocationCoordinate2D?
 
     var id: String { summary.id }
     var name: String { summary.name }
+
+    /// Kept as a computed property so every "3 control streams" badge written
+    /// before commanding existed goes on meaning what it meant.
+    var controlStreamCount: Int { controlStreams.count }
+
+    /// The first control stream that describes a pan/tilt/zoom camera.
+    ///
+    /// First rather than merged: two PTZ control streams on one system would be
+    /// two gimbals, and driving both from one D-pad would move a camera the
+    /// user is not looking at.
+    var ptzCapability: PTZCapability? {
+        controlStreams.compactMap(\.ptz).first
+    }
+
+    var isCommandable: Bool { !controlStreams.isEmpty }
 
     // MARK: Position
 
@@ -152,6 +213,12 @@ struct RemoteSystem: Identifiable, Sendable {
         datastreams.filter { if case .bearing = $0.role { return true } else { return false } }
     }
 
+    /// Streams that designate a target point. These put a marker and a line on
+    /// the map without ever contributing to this system's own position.
+    var targetDatastreams: [RemoteDatastream] {
+        datastreams.filter { if case .target = $0.role { return true } else { return false } }
+    }
+
     /// A single-entity orientation stream, which is how a phone's separate
     /// location and attitude outputs become one rotated marker.
     var soleOrientation: (datastream: RemoteDatastream, paths: OrientationPaths)? {
@@ -161,6 +228,18 @@ struct RemoteSystem: Identifiable, Sendable {
         }
         guard matches.count == 1 else { return nil }
         return matches[0]
+    }
+
+    // MARK: Activity
+
+    /// How fresh this system is, from what the node said at load.
+    ///
+    /// Derived rather than stored so it cannot go quietly out of date in a
+    /// cached RemoteSystem: an entry sits in RemoteSystemLoader's cache for
+    /// five minutes, which is exactly the width of the `.live` window. Views
+    /// read ActivityTracker, which this seeds.
+    var activity: SystemActivity {
+        SystemActivity.derive(from: datastreams.map(\.summary))
     }
 
     // MARK: Character
@@ -185,6 +264,7 @@ struct RemoteSystem: Identifiable, Sendable {
     private static func viewingRank(_ datastream: RemoteDatastream) -> Int {
         switch datastream.role {
         case .location:    return 100
+        case .target:      return 95
         case .orientation: return 90
         case .bearing:     return 80
         default:

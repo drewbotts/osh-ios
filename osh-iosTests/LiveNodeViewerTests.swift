@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CoreLocation
 @testable import osh_ios
 
 // MARK: - LiveNodeViewerTests
@@ -161,7 +162,7 @@ struct LiveNodeViewerTests {
             return
         }
 
-        let model = NodeMapModel()
+        let model = COPMapModel()
         let connection = try NodeConnection(server: LiveNode.server())
         await model.load(connection: connection)
         defer { model.stopAll() }
@@ -175,10 +176,25 @@ struct LiveNodeViewerTests {
             LiveNode.report("Direction-finding system: \(station.name) [\(station.id)] "
                             + "· position \(station.positionKind.map(String.init(describing:)) ?? "none")")
 
-            // A DF station's position comes from a settings record's
-            // stationConfig, and its rotation from the heading beside it — the
-            // whole reason the location search learned to recurse.
-            #expect(station.hasPosition, "\(station.name) reports no position anywhere")
+            // A bearing output does not imply a position. A KrakenSDR's comes
+            // from a settings record's stationConfig, with its rotation from
+            // the heading beside it — the whole reason the location search
+            // learned to recurse. A laser range finder's azimuth is a bearing
+            // too, and its registration says nothing about where the phone
+            // holding it is: nothing locates it, so nothing is drawn for it,
+            // and that is the correct answer rather than a gap.
+            guard station.hasPosition else {
+                let orphans = model.markers.filter { $0.id.hasPrefix(station.id) }
+                    .filter { !$0.id.contains("#target-") }
+                let orphanLines = model.bearingLines.filter { line in
+                    station.bearingDatastreams.contains { $0.id == line.id }
+                }
+                LiveNode.report("    nothing locates this system: "
+                                + "\(orphans.count) own marker(s), \(orphanLines.count) LOB")
+                #expect(orphans.isEmpty, "a system with no position must not get a marker")
+                #expect(orphanLines.isEmpty, "a bearing line needs an origin")
+                continue
+            }
 
             let markers = model.markers.filter { $0.id.hasPrefix(station.id) }
             for marker in markers {
@@ -208,6 +224,92 @@ struct LiveNodeViewerTests {
             if hasArchive {
                 #expect(!lines.isEmpty,
                         "\(station.name) has archived bearings but drew no line")
+            }
+        }
+    }
+
+    // MARK: Targets
+
+    @Test("A target stream draws a marker at the target and a line from its source",
+          .timeLimit(.minutes(3)))
+    @MainActor
+    func targetStreamDrawsALineFromItsSource() async throws {
+        let client = try LiveNode.readClient()
+        let loader = RemoteSystemLoader()
+
+        var owners: [RemoteSystem] = []
+        var everySystem: [RemoteSystem] = []
+        for summary in try await client.listSystems(limit: 200) {
+            guard case .success(let system) = await loader.load(systemId: summary.id,
+                                                                using: client,
+                                                                serverId: UUID()) else { continue }
+            everySystem.append(system)
+            if !system.targetDatastreams.isEmpty { owners.append(system) }
+        }
+
+        guard !owners.isEmpty else {
+            LiveNode.report("No target stream on this node; nothing to check.")
+            return
+        }
+
+        let model = COPMapModel()
+        let connection = try NodeConnection(server: LiveNode.server())
+        await model.load(connection: connection)
+        defer { model.stopAll() }
+
+        // One archived observation each for the target and for whatever locates
+        // its source, both fetched on load.
+        try? await Task.sleep(for: .seconds(5))
+        model.refreshAnnotations()
+
+        for owner in owners {
+            for datastream in owner.targetDatastreams {
+                LiveNode.report("Target stream: \(datastream.name) [\(datastream.id)] "
+                                + "on \(owner.name) [\(owner.id)]")
+
+                // The role's promise: the coordinates in the record are the
+                // target's, so they must not have become this system's marker.
+                #expect(datastream.embeddedPosition == nil,
+                        "a target's coordinates must not be an embedded position")
+
+                let targets = model.targets(system: owner, datastream: datastream)
+                LiveNode.report("    \(targets.count) target(s) drawn")
+
+                for target in targets {
+                    let source = target.source
+                    LiveNode.report("""
+                            target at \(target.coordinate.latitude), \
+                        \(target.coordinate.longitude) as of \(target.observedAt)
+                            source \(source?.name ?? "none") \
+                        [\(source?.systemId ?? "-")] by \
+                        \(source?.resolution.rawValue ?? "-") \
+                        at \(source?.coordinate.map { "\($0.latitude), \($0.longitude)" } ?? "no position")
+                        """)
+
+                    // A marker at the target, always.
+                    #expect(model.markers.contains { $0.id == target.markerId },
+                            "a designated target must have a marker")
+
+                    // A line only when something locates the source, which is
+                    // the honest fallback rather than a failure.
+                    let line = model.targetLines.first { $0.id == target.markerId }
+                    if let origin = source?.coordinate {
+                        let drawn = try #require(line, "a located source must draw a line")
+                        #expect(drawn.start.latitude == origin.latitude)
+                        #expect(drawn.end.latitude == target.coordinate.latitude)
+
+                        // Sanity on the geometry: a range finder reaches
+                        // hundreds of metres, not hundreds of kilometres.
+                        let metres = CLLocation(latitude: origin.latitude,
+                                                longitude: origin.longitude)
+                            .distance(from: CLLocation(latitude: target.coordinate.latitude,
+                                                        longitude: target.coordinate.longitude))
+                        LiveNode.report(String(format: "    source is %.0f m from the target",
+                                                metres))
+                    } else {
+                        #expect(line == nil, "a line needs an origin")
+                    }
+                }
             }
         }
     }

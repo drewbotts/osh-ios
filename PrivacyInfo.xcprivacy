@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Privacy manifest. One file, listed in the Resources phase of both the
+	     app and the widget extension, because each bundle is validated on its
+	     own and an appex without a manifest is rejected on upload.
+
+	     Two required-reason APIs are actually reached, and no others:
+
+	       UserDefaults        AppSettingsStore, AppConfig, KeychainServerStore
+	                           and the two registration caches. All of it is the
+	                           app's own settings — server list, sensor toggles,
+	                           map layers, the system id a node handed back.
+	       systemUptime        VideoOutput turns a frame's presentation
+	                           timestamp, which CoreMedia gives as device
+	                           uptime, into a wall-clock instant so an
+	                           observation carries the time it was captured.
+
+	     Checked and absent: file timestamps (contentModificationDate,
+	     creationDate, stat), disk space, and active keyboards. Add a category
+	     here if one of those ever appears — the upload will not fail, but the
+	     app will be rejected at review. -->
+
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<!-- Nothing leaves the device except to the server the user typed in, and
+	     nothing is collected by the developer. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- CA92.1 — read and write information accessible only to the
+				     app itself. No app group, no shared suite. -->
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- 35F9.1 — measure elapsed time between events inside the
+				     app. Here: uptime-based frame timestamps to wall clock. -->
+				<string>35F9.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

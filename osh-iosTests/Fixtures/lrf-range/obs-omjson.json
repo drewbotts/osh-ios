@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "id": "02ne3au3op6g1dlsqra0c0rl0a00",
+      "datastream@id": "02ne3au3op6g",
+      "phenomenonTime": "2026-08-31T15:31:02.058Z",
+      "resultTime": "2026-08-31T15:31:02.058Z",
+      "result": {
+        "horizDistance": 16.72,
+        "slopeDistance": 16.83,
+        "azimuth": 287.7,
+        "inclination": -6.5,
+        "height": "NaN"
+      }
+    }
+  ]
+}

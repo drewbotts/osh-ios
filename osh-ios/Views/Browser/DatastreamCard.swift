@@ -13,6 +13,11 @@ struct DatastreamCard: View {
     let datastream: RemoteDatastream
     @ObservedObject var session: SystemLiveSession
     var onExpandMap: ((RemoteDatastream) -> Void)?
+    /// What a `.target` card needs to name the system a target was observed
+    /// from. Absent everywhere else, and absent even here when the host has no
+    /// system list to resolve against — the card then says what the record
+    /// says and nothing more.
+    var targetContext: TargetCardContext?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -30,10 +35,7 @@ struct DatastreamCard: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                Circle()
-                    .fill(stateColor)
-                    .frame(width: 8, height: 8)
-                    .accessibilityHidden(true)
+                ActivityDot(state: activity.state, lastObservation: activity.lastObservation)
                 Text(datastream.name)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
@@ -55,27 +57,51 @@ struct DatastreamCard: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Schema and raw observations")
             }
-            if let entityCount, entityCount > 1 {
-                Text("\(entityCount) entities")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                if let text = ActivityText.relative(activity.lastObservation) {
+                    Text(text)
+                }
+                if let socket = socketText {
+                    Text("· \(socket)")
+                }
+                if let entityCount, entityCount > 1 {
+                    Text("· \(entityCount) entities")
+                }
             }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(datastream.name), \(datastream.role.label)")
+        .accessibilityLabel("\(datastream.name), \(datastream.role.label), \(ActivityText.accessibility(state: activity.state, lastObservation: activity.lastObservation))")
     }
 
     private var state: SystemLiveSession.StreamState {
         session.streamState[datastream.id] ?? .idle
     }
 
-    private var stateColor: Color {
+    /// The socket's own state, said in words and only when it is worth saying.
+    ///
+    /// Freshness and connectivity are two facts and the dot can only carry one.
+    /// The dot carries freshness because that is what the user is looking at
+    /// the card for; a socket that is merely connecting or has dropped is worth
+    /// a word, and a socket that is happily streaming is worth nothing at all.
+    private var socketText: String? {
         switch state {
-        case .streaming:    return .green
-        case .connecting:   return .orange
-        case .disconnected: return .red
-        case .idle:         return .secondary
+        case .streaming:              return nil
+        case .connecting:             return "connecting"
+        case .idle:                   return "not subscribed"
+        case .disconnected(let text): return text.map { "disconnected: \($0)" } ?? "disconnected"
         }
+    }
+
+    /// This datastream's own freshness: the newest observation the session has,
+    /// falling back to what the node reported at load for a stream nothing has
+    /// subscribed to yet.
+    private var activity: SystemActivity {
+        let newest = session.newest(datastreamId: datastream.id)?.phenomenonTime
+            ?? SystemActivity.endOfRange(datastream.summary, openEndedAs: Date())
+        return SystemActivity(state: ActivityState.of(newest, now: Date()),
+                              lastObservation: newest)
     }
 
     private var entityCount: Int? {
@@ -99,6 +125,8 @@ struct DatastreamCard: View {
             }
         } else {
             switch role {
+            case .target(let paths):
+                targetBody(paths)
             case .location(let paths, let headingPath):
                 locationBody(paths, headingPath: headingPath)
             case .orientation(let paths):
@@ -115,6 +143,54 @@ struct DatastreamCard: View {
                 statusBody
             }
         }
+    }
+
+    // MARK: Target
+
+    /// A designated target: where it is, how far and which way, and who was
+    /// looking.
+    ///
+    /// No map tile. The point of a target is the *pair* of positions, and a
+    /// 150-point card cannot show a line between two points a kilometre apart
+    /// and remain readable — the COP map is where that lives, which is what the
+    /// source name links to.
+    @ViewBuilder
+    private func targetBody(_ paths: TargetPaths) -> some View {
+        let entities = session.entities(datastreamId: datastream.id)
+
+        if entities.isEmpty {
+            Text("no targets designated yet")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(entities, id: \.key) { entity in
+                    TargetSummaryView(paths: paths,
+                                      observation: entity.observation,
+                                      entityKey: entity.key,
+                                      source: source(for: entity.observation, paths: paths),
+                                      onSelectSource: targetContext?.onSelectSource)
+                }
+            }
+        }
+    }
+
+    /// The system this target was observed from, when the host gave us enough
+    /// to work it out.
+    private func source(for observation: ParsedObservation,
+                        paths: TargetPaths) -> TargetSourceResolver.SourceRef? {
+        let context = targetContext ?? TargetCardContext()
+        // The owner is always a candidate even when the host passed no list:
+        // rules iii and v need nothing else.
+        var systems = context.systems
+        if !systems.contains(where: { $0.id == session.system.id }) {
+            systems.append(session.system)
+        }
+        return TargetSourceResolver.source(for: observation,
+                                           datastream: datastream,
+                                           owner: session.system,
+                                           systems: systems,
+                                           localDevice: context.localDevice)
     }
 
     // MARK: Location
@@ -350,6 +426,120 @@ struct StatusGroup {
             return vector.coordinates.flatMap { collect($0.component, at: path.appending($0.name)) }
         default:
             return [SchemaWalker.Leaf(path: path, component: component)]
+        }
+    }
+}
+
+// MARK: - TargetCardContext
+
+/// What a host screen lends a `.target` card so it can name the target's
+/// source.
+///
+/// Passed in rather than fetched because the systems are already loaded
+/// somewhere: the COP map holds every system on the node, and the systems list
+/// hands its own down to the dashboard. A card that went and loaded them again
+/// would be a second copy and a second failure mode for a system *name*.
+struct TargetCardContext {
+    var systems: [RemoteSystem] = []
+    var localDevice: TargetSourceResolver.LocalDeviceRef?
+    /// Sends the user to the source on the map. nil makes the name plain text.
+    var onSelectSource: ((TargetSourceResolver.SourceRef) -> Void)?
+}
+
+// MARK: - TargetSummaryView
+
+/// One designated target, in words.
+///
+/// Shared by the dashboard's target card and the map sheet's static summary so
+/// a target reads the same whether or not a socket is open behind it.
+struct TargetSummaryView: View {
+
+    let paths: TargetPaths
+    let observation: ParsedObservation
+    var entityKey: String = ""
+    let source: TargetSourceResolver.SourceRef?
+    let onSelectSource: ((TargetSourceResolver.SourceRef) -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: SystemGlyph.targetMarkerSymbol)
+                    .foregroundStyle(.red)
+                Text(headline)
+                    .font(.title3.monospacedDigit().weight(.semibold))
+                Spacer(minLength: 0)
+            }
+
+            LocationSummaryView(paths: paths.location, observation: observation)
+
+            if let elevation = value(paths.elevation) {
+                angleRow("elevation", elevation)
+            }
+            if let azimuth = value(paths.azimuth), value(paths.range) == nil {
+                // Only when the headline did not already say it.
+                angleRow("azimuth", azimuth)
+            }
+
+            sourceRow
+
+            // Prominent for the same reason a LOB's is: a range finder fires
+            // when someone pulls the trigger, and the reading on screen may be
+            // hours old and still be the answer.
+            AsOfLabel(timestamp: observation.phenomenonTime, prominent: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Range and azimuth when the record carries them, else what the target is
+    /// called, else just "Target".
+    private var headline: String {
+        TargetStyle.label(rangeMeters: value(paths.range),
+                          azimuthDegrees: value(paths.azimuth))
+            ?? (entityKey.isEmpty ? "Target" : entityKey)
+    }
+
+    @ViewBuilder
+    private var sourceRow: some View {
+        if let source {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.turn.down.right")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("from")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let onSelectSource {
+                    Button(source.name) { onSelectSource(source) }
+                        .font(.caption.weight(.medium))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tint)
+                } else {
+                    Text(source.name)
+                        .font(.caption.weight(.medium))
+                }
+                if !source.hasPosition {
+                    Text("· position unknown")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func value(_ path: FieldPath?) -> Double? {
+        guard let path, let value = observation.values[path]?.asDouble, value.isFinite
+        else { return nil }
+        return value
+    }
+
+    private func angleRow(_ label: String, _ degrees: Double) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(String(format: "%.1f°", degrees))
+                .font(.caption.monospacedDigit())
         }
     }
 }

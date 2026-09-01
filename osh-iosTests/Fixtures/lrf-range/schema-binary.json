@@ -1,0 +1,110 @@
+{
+  "obsFormat": "application/swe+binary",
+  "recordSchema": {
+    "type": "DataRecord",
+    "name": "rangeData",
+    "fields": [
+      {
+        "type": "Time",
+        "name": "time",
+        "definition": "http://www.opengis.net/def/property/OGC/0/PhenomenonTime",
+        "label": "Phenomenon Time",
+        "referenceFrame": "http://www.opengis.net/def/trs/BIPM/0/UTC",
+        "uom": {
+          "href": "http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "horizDistance",
+        "definition": "http://qudt.org/vocab/quantitykind/Distance",
+        "label": "Horizontal Distance",
+        "description": "Horizontal distance to target",
+        "uom": {
+          "code": "m"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "slopeDistance",
+        "definition": "http://qudt.org/vocab/quantitykind/Distance",
+        "label": "LineOfSight Distance",
+        "description": "Line-of-sight distance to target",
+        "uom": {
+          "code": "m"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "azimuth",
+        "definition": "http://sensorml.com/ont/swe/property/AzimuthAngle",
+        "label": "Azimuth Angle",
+        "description": "Azimuth/Heading angle of line-of-sight measured from true north",
+        "referenceFrame": "http://www.opengis.net/def/cs/OGC/0/NED",
+        "axisID": "z",
+        "uom": {
+          "code": "deg"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "inclination",
+        "definition": "http://sensorml.com/ont/swe/property/ElevationAngle",
+        "label": "Elevation Angle",
+        "description": "Inclination/Elevation of line-of-sight from the horizontal plane",
+        "referenceFrame": "http://www.opengis.net/def/cs/OGC/0/NED",
+        "axisID": "y",
+        "uom": {
+          "code": "deg"
+        }
+      },
+      {
+        "type": "Quantity",
+        "name": "height",
+        "definition": "http://qudt.org/vocab/quantitykind/Height",
+        "label": "Height of Target",
+        "description": "Height of the target",
+        "uom": {
+          "code": "m"
+        }
+      }
+    ]
+  },
+  "recordEncoding": {
+    "type": "BinaryEncoding",
+    "byteOrder": "bigEndian",
+    "byteEncoding": "raw",
+    "members": [
+      {
+        "type": "Component",
+        "ref": "/time",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/horizDistance",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/slopeDistance",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/azimuth",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/inclination",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      },
+      {
+        "type": "Component",
+        "ref": "/height",
+        "dataType": "http://www.opengis.net/def/dataType/OGC/0/double"
+      }
+    ]
+  }
+}

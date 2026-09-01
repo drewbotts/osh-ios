@@ -38,11 +38,11 @@ struct RemoteSystemTests {
                                datastreams: [RemoteDatastream],
                                fixedLocation: CLLocationCoordinate2D? = nil,
                                subsystems: [SystemSummary] = [],
-                               controlStreams: Int = 0) -> RemoteSystem {
+                               controlStreams: [RemoteControlStream] = []) -> RemoteSystem {
         RemoteSystem(summary: SystemSummary(id: id, name: name),
                      subsystems: subsystems,
                      datastreams: datastreams,
-                     controlStreamCount: controlStreams,
+                     controlStreams: controlStreams,
                      fixedLocation: fixedLocation)
     }
 

@@ -17,6 +17,10 @@ final class NodeConnection: ObservableObject {
     let server: ServerConfig
     let readClient: ConnectedSystemsReadClient
     let writeClient: ConnectedSystemsClient
+    /// Commanding. Separate from writeClient because posting an observation and
+    /// commanding a camera are different privileges on a node that models them,
+    /// and because a command wants a much shorter timeout than a bulk post.
+    let commandClient: CommandClient
 
     /// Result of the most recent connectivity check, or nil if none has run.
     @Published private(set) var reachability: ConnectivityResult?
@@ -33,6 +37,9 @@ final class NodeConnection: ObservableObject {
         self.writeClient = try ConnectedSystemsClient(nodeURL: server.url,
                                                       username: server.username,
                                                       password: server.password)
+        self.commandClient = try CommandClient(nodeURL: server.url,
+                                               username: server.username,
+                                               password: server.password)
     }
 
     func checkConnectivity() async {

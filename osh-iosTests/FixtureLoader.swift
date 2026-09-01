@@ -25,6 +25,8 @@ enum FixtureLoader {
         case krakenSettings     = "kraken-settings"      // deeply nested DataRecord
         case krakenDOA          = "kraken-doa"            // direction finding: LOB + confidence
         case choicePTZControl   = "choice-ptz-control"   // DataChoice (control stream)
+        case lrfTarget          = "lrf-target"           // a designated target point
+        case lrfRange           = "lrf-range"            // azimuth with no location vector
     }
 
     /// The fixture tree: the copy inside the test bundle when there is one,

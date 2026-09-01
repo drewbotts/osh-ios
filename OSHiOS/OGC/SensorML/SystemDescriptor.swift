@@ -50,6 +50,18 @@ struct SystemDescriptor {
         self.description   = ""
     }
 
+    /// This device's system UID, as `init` builds it.
+    ///
+    /// nil when UIKit has no vendor identifier: `init` invents one so a
+    /// registration can still go out, and an invented UID is no use as a lookup
+    /// key — which is all this is for.
+    @MainActor
+    static var currentDeviceUID: String? {
+        UIDevice.current.identifierForVendor.map {
+            "\(uidPrefix):\($0.uuidString.lowercased())"
+        }
+    }
+
     // MARK: - JSON serialisation
 
     /// Returns the SensorML-JSON Data for POST /api/systems.

@@ -1,0 +1,59 @@
+{
+  "obsFormat": "application/swe+json",
+  "recordSchema": {
+    "type": "DataRecord",
+    "name": "targetLoc",
+    "fields": [
+      {
+        "type": "Time",
+        "name": "time",
+        "definition": "http://www.opengis.net/def/property/OGC/0/PhenomenonTime",
+        "label": "Phenomenon Time",
+        "referenceFrame": "http://www.opengis.net/def/trs/BIPM/0/UTC",
+        "uom": {
+          "href": "http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"
+        }
+      },
+      {
+        "type": "Vector",
+        "name": "location",
+        "definition": "http://sensorml.com/ont/swe/property/FeatureOfInterestLocation",
+        "label": "Target Location",
+        "referenceFrame": "http://www.opengis.net/def/crs/EPSG/0/4979",
+        "coordinates": [
+          {
+            "type": "Quantity",
+            "name": "lat",
+            "definition": "http://sensorml.com/ont/swe/property/GeodeticLatitude",
+            "label": "Geodetic Latitude",
+            "axisID": "Lat",
+            "uom": {
+              "code": "deg"
+            }
+          },
+          {
+            "type": "Quantity",
+            "name": "lon",
+            "definition": "http://sensorml.com/ont/swe/property/Longitude",
+            "label": "Longitude",
+            "axisID": "Lon",
+            "uom": {
+              "code": "deg"
+            }
+          },
+          {
+            "type": "Quantity",
+            "name": "alt",
+            "definition": "http://sensorml.com/ont/swe/property/HeightAboveEllipsoid",
+            "label": "Ellipsoidal Height",
+            "description": "Altitude above WGS84 ellipsoid",
+            "axisID": "h",
+            "uom": {
+              "code": "m"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "type": "Feature",
+  "id": "02nqpau0r420",
+  "geometry": null,
+  "properties": {
+    "uid": "urn:lasertech:trupulse360:7ae57419dd427e4c:replay",
+    "featureType": "http://www.w3.org/ns/sosa/Sensor",
+    "name": "Laser Range Finder LRF",
+    "validTime": [
+      "2026-08-27T01:38:32.252Z",
+      "now"
+    ]
+  },
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02nqpau0r420",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in SensorML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02nqpau0r420?f=sml3",
+      "type": "application/sml+json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02nqpau0r420?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "datastreams",
+      "title": "List of system datastreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02nqpau0r420/datastreams?f=json",
+      "type": "application/json"
+    }
+  ]
+}

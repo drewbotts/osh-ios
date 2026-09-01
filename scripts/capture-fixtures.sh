@@ -168,6 +168,12 @@ PY
 #   kraken-doa          direction-finding LOB; emits only on detection, so its
 #                       binary capture comes from REST rather than the socket
 #   choice-ptz-control  control stream whose paramsSchema is a DataChoice
+#   lrf-target          a laser range finder's target point: Time + a Vector
+#                       defined as FeatureOfInterestLocation, observed from a
+#                       phone that the record never names
+#   lrf-range           the same range finder's range/azimuth/inclination
+#                       record — an azimuth with no location vector, which must
+#                       stay a bearing
 #
 # `capture` takes an optional slug filter — `capture kraken-doa` refreshes one
 # fixture folder and leaves the committed rest untouched.
@@ -189,7 +195,20 @@ DATASTREAMS = [
     ("gps",                 "0k0g",         "0k0g"),
     ("kraken-settings",     "0g0g",         "0g0g"),
     ("kraken-doa",          "0g10",         "0g0g"),
+    ("lrf-target",          "03d9tsleg9eg", "02nqpau0r420"),
+    ("lrf-range",           "02ne3au3op6g", "02nqpau0r420"),
 ]
+
+# slug -> extra systems to capture beside the datastream's own, as
+# (file prefix, system id). A laser range finder observes a target *from*
+# somewhere, and the phone it is carried by is a second system: how the two are
+# related — a parent link, a subsystem entry, an identifier in the record, or
+# nothing at all — is exactly what the source resolver has to decide, so both
+# registrations and both subsystem collections are captured, empty or not.
+RELATED_SYSTEMS = {
+    "lrf-target": [("source", "02cfdsfiopmg")],
+    "lrf-range":  [("source", "02cfdsfiopmg")],
+}
 
 # slug -> (system id, control stream id)
 CONTROL_STREAMS = [
@@ -351,8 +370,18 @@ for slug, did, sid in DATASTREAMS:
     capture_binary(slug, did)
     write_if_200(slug, "system.json", f"/systems/{sid}")
     subs = get_json(f"/systems/{sid}/subsystems?limit=100")
-    if subs is not None and items(subs):
+    # Normally written only when non-empty. For a slug with related systems the
+    # empty collection is the finding — "the LRF is not a subsystem of the
+    # phone" is a fact a test asserts — so it is written either way.
+    if subs is not None and (items(subs) or slug in RELATED_SYSTEMS):
         write(slug, "subsystems.json", json.dumps(subs, indent=2) + "\n")
+
+    for prefix, related in RELATED_SYSTEMS.get(slug, []):
+        write_if_200(slug, f"{prefix}-system.json", f"/systems/{related}")
+        related_subs = get_json(f"/systems/{related}/subsystems?limit=100")
+        if related_subs is not None:
+            write(slug, f"{prefix}-subsystems.json",
+                  json.dumps(related_subs, indent=2) + "\n")
 
 # ── control stream fixtures (Pass 4 seed; no command support in this pass) ────
 for slug, sid, csid in CONTROL_STREAMS:

@@ -1,0 +1,79 @@
+{
+  "id": "02ne3au3op6g",
+  "name": "Laser Range Finder LRF - rangeData",
+  "system@id": "02nqpau0r420",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/02nqpau0r420?f=json",
+    "uid": "urn:lasertech:trupulse360:7ae57419dd427e4c:replay",
+    "type": "application/geo+json"
+  },
+  "outputName": "rangeData",
+  "validTime": [
+    "2026-08-27T01:38:32.252Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-08-31T15:31:02.058Z",
+    "2026-08-31T15:31:02.058Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://qudt.org/vocab/quantitykind/Distance",
+      "label": "Horizontal Distance",
+      "description": "Horizontal distance to target"
+    },
+    {
+      "definition": "http://qudt.org/vocab/quantitykind/Distance",
+      "label": "LineOfSight Distance",
+      "description": "Line-of-sight distance to target"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/AzimuthAngle",
+      "label": "Azimuth Angle",
+      "description": "Azimuth/Heading angle of line-of-sight measured from true north"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/ElevationAngle",
+      "label": "Elevation Angle",
+      "description": "Inclination/Elevation of line-of-sight from the horizontal plane"
+    },
+    {
+      "definition": "http://qudt.org/vocab/quantitykind/Height",
+      "label": "Height of Target",
+      "description": "Height of the target"
+    }
+  ],
+  "resultType": "record",
+  "formats": [
+    "application/om+json",
+    "application/swe+json",
+    "application/swe+csv",
+    "application/swe+xml",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02ne3au3op6g",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02ne3au3op6g?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02nqpau0r420?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02ne3au3op6g/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

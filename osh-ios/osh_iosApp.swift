@@ -10,6 +10,7 @@ struct osh_iosApp: App {
     @StateObject private var settings    = AppSettingsStore()
     @StateObject private var connections = NodeConnectionStore()
     @StateObject private var session     = SensorSession()
+    @StateObject private var activity    = ActivityTracker.shared
 
     var body: some Scene {
         WindowGroup {
@@ -17,6 +18,14 @@ struct osh_iosApp: App {
                 .environmentObject(settings)
                 .environmentObject(connections)
                 .environmentObject(session)
+                .environmentObject(activity)
+                // The decay timer is what turns a green dot amber when a system
+                // simply stops talking; nothing else would ever redraw it.
+                .task { activity.start() }
+                // This device is live by definition while its own session runs.
+                .onChange(of: session.isActive) { _, isActive in
+                    activity.isLocalDeviceStreaming = isActive
+                }
                 // Keep the node connection in step with the selected server.
                 // @Published fires on willSet, so the *new* value is taken from
                 // the closure argument rather than re-read from the store.

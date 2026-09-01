@@ -1,29 +1,33 @@
 import SwiftUI
 import AVFoundation
 
-// MARK: - CameraTabView
+// MARK: - DeviceCameraView
 //
 // Live preview while streaming, and the encoder settings otherwise. The
 // settings are locked during a session because the datastream is registered
 // with the resolution and codec the node will receive — changing them mid-run
 // would make the registered schema a lie.
+//
+// This was the Camera tab until the video wall absorbed it. Nothing inside
+// changed: the wall shows this device's preview as its first tile and pushes
+// here for the controls, which is one tap further away and one whole tab
+// cheaper.
 
-struct CameraTabView: View {
+struct DeviceCameraView: View {
 
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: SensorSession
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if settings.config.enableVideoH264 {
-                    enabledContent
-                } else {
-                    disabledContent
-                }
+        Group {
+            if settings.config.enableVideoH264 {
+                enabledContent
+            } else {
+                disabledContent
             }
-            .navigationTitle("Camera")
         }
+        .navigationTitle("This Device")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     // MARK: Enabled
@@ -174,6 +178,8 @@ struct CameraTabView: View {
 }
 
 #Preview {
-    CameraTabView()
-        .previewEnvironment()
+    NavigationStack {
+        DeviceCameraView()
+    }
+    .previewEnvironment()
 }

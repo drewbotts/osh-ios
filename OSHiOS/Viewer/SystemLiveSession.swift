@@ -302,6 +302,10 @@ final class SystemLiveSession: ObservableObject {
 
         guard admit(observation, datastreamId: datastreamId, entity: entity) else { return }
 
+        ActivityTracker.shared.record(observation,
+                                      serverId: connection.server.id,
+                                      systemId: system.id)
+
         latest[datastreamId, default: [:]][entity] = observation
 
         var ring = history[datastreamId] ?? []
@@ -346,6 +350,13 @@ final class SystemLiveSession: ObservableObject {
         let datastreamId = observation.datastreamId
 
         recordBlockArrival(datastreamId: datastreamId, byteCount: data.count)
+        // Frames skip publish() — see above — so activity is recorded here
+        // instead. A camera delivering 15 fps is the most live thing on a node
+        // and would otherwise read as offline.
+        ActivityTracker.shared.record(datastreamId: datastreamId,
+                                      at: observation.phenomenonTime,
+                                      serverId: connection.server.id,
+                                      systemId: system.id)
 
         guard MJPEGDecoder.canDecode(compression: codec) else { return }
         if let frame = await MJPEGDecoder.shared.decode(data,
@@ -379,7 +390,8 @@ final class SystemLiveSession: ObservableObject {
     /// any age: KrakenSDR emits only when it detects a signal, so the most
     /// recent LOB may be from Tuesday and is still the thing to show. A stream
     /// that merely reports a position is the same case — one record, however
-    /// old, is what puts the marker on the map.
+    /// old, is what puts the marker on the map. So is a target designation:
+    /// event-driven, and worth exactly its latest record at any age.
     private func bootstrap(_ datastreams: [RemoteDatastream]) async {
         await withTaskGroup(of: (String, [ParsedObservation]).self) { group in
             for datastream in datastreams {
@@ -437,7 +449,10 @@ final class SystemLiveSession: ObservableObject {
         switch datastream.role {
         case .location, .timeseries:
             return .window(seconds: bootstrapWindow, limit: 300)
-        case .bearing:
+        case .bearing, .target:
+            // A target designation is the same case as a LOB: a range finder
+            // fires when someone pulls the trigger, so the last target may be
+            // from Tuesday and is still the thing to draw.
             return .mostRecent
         case .video:
             return nil

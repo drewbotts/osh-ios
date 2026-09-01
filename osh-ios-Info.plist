@@ -2,13 +2,28 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Everything else is generated from INFOPLIST_KEY_* build settings.
-	     UIBackgroundModes has no INFOPLIST_KEY_ alias, and GPSOutput traps at
-	     runtime if allowsBackgroundLocationUpdates is set without it, so this
-	     file exists purely to declare it. -->
+	<!-- Everything with an INFOPLIST_KEY_ alias is a build setting instead; see
+	     the osh-ios target. This file carries the keys that have no alias, or
+	     whose value must be a real plist type rather than the string an
+	     INFOPLIST_KEY_ setting would produce. -->
+
+	<!-- UIBackgroundModes has no INFOPLIST_KEY_ alias, and GPSOutput traps at
+	     runtime if allowsBackgroundLocationUpdates is set without it. -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
 	</array>
+
+	<!-- The node a user adds is almost always on the same LAN — an OSH box on a
+	     field network, reached by IP. Without this the first connection attempt
+	     fails silently on iOS 14+. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connects to OpenSensorHub nodes on your local network</string>
+
+	<!-- Must be a genuine boolean: App Store Connect ignores the string "NO"
+	     and asks the export-compliance questions anyway. The app uses only
+	     HTTPS/TLS through the OS, which is exempt. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

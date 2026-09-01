@@ -5,6 +5,348 @@ than by release, because the app has not shipped a versioned build yet.
 
 ---
 
+## Pass 3d — TestFlight distribution
+
+No behaviour change: build configuration, distribution metadata and one release
+document. `xcodebuild archive -destination 'generic/platform=iOS'` now completes
+signed, with zero compiler warnings, and the app and its widget carry matching
+versions.
+
+### Added
+
+**`PrivacyInfo.xcprivacy`**, one file listed in the Resources phase of both the
+app and the widget extension — each bundle is validated separately and an
+extension without a manifest is rejected on upload. Two required-reason APIs are
+actually reached and both are declared: `UserDefaults` (`CA92.1`, the app's own
+settings) and `systemUptime` (`35F9.1`, `VideoOutput` turning a frame's
+uptime-based presentation timestamp into a wall-clock instant). File timestamps,
+disk space and active keyboards were checked for and are not used. No tracking,
+no collected data types.
+
+**`scripts/stamp-build-version.sh`**, a last build phase on both targets. It
+rewrites the *built* `Info.plist` — `CURRENT_PROJECT_VERSION` is consumed while
+that plist is generated, long before a script phase could change it — setting
+`CFBundleVersion` from `git rev-list --count HEAD`, falling back to 1 without
+git. Both targets run the same script over the same repository, so the app and
+the extension get identical values by construction; App Store Connect rejects an
+upload whose extension version does not match its app's. Every write is read
+back and the build fails if it did not take: PlistBuddy exits 0 on some write
+failures, and a version stamp that silently did nothing is worse than none.
+
+**`docs/RELEASING.md`** — archive and upload steps, the version-bump policy, the
+90-day TestFlight expiry and what it means for cadence, "What to Test" copy for
+App Store Connect, and the portal-side work that cannot be done from here.
+
+`NSLocalNetworkUsageDescription` and `ITSAppUsesNonExemptEncryption` in
+`osh-ios-Info.plist`. Both belong in the file rather than in an `INFOPLIST_KEY_`
+build setting: nodes are reached by IP on a LAN, so the first connection fails
+silently without the former, and the latter has to be a real boolean, which a
+build setting cannot produce.
+
+### Changed
+
+The bundle identifier is `org.opensensorhub.oshios`, from
+`org.opensensorhub.osh-ios`, with the widget extension following it to
+`org.opensensorhub.oshios.OSHiOSWidgets` — an extension's id has to stay a
+prefix-child of its app's. The test bundles moved to `org.opensensorhub.oshios.tests`
+and `.uitests` for consistency; they never ship. `Logging.subsystem` has said
+`org.opensensorhub.oshios` since it was written, so the OSLog subsystem and the
+bundle id finally agree.
+
+Nothing in code reads the identifier, and the Keychain service is the hardcoded
+`osh.ios`, so no source change was needed. But the identifier *is* the
+UserDefaults domain and the default Keychain access group, so a device carrying
+an older build sees the renamed app as a fresh install: saved servers, sensor
+toggles and map layers are not migrated. Nothing has shipped, so the cost is
+one re-entry on dev devices.
+
+`MARKETING_VERSION` is `0.9.0` on every target. The four usage-description
+strings were rewritten for a reviewer rather than a developer: the location one
+now says recording continues while the screen is locked, and the microphone one
+says only a loudness figure is sent and no audio is recorded.
+`NSMotionUsageDescription` stays — `BarometerOutput` uses `CMAltimeter`, which
+requires it.
+
+The three 1024×1024 app icons are re-encoded without an alpha channel. They were
+fully opaque RGBA, and an alpha channel — even an opaque one — is rejected as
+ITMS-90717. Identical pixels, and a sixth of the bytes.
+
+`ENABLE_USER_SCRIPT_SANDBOXING = NO` on the app and widget targets, which is
+what the stamping script needs to read `.git` and write the built plist. It
+stays `YES` at the project level, so the test targets keep it.
+
+`EXCLUDED_SOURCE_FILE_NAMES = "*.md"` on those same two targets. The
+synchronized folder groups were sweeping `ROLES.md`, `COMMANDS.md` and
+`BINARY_FORMAT.md` into the shipped bundle — 40 KB of internal design notes
+inside the app.
+
+---
+
+## Pass 3c.1 — laser range finder targets
+
+A laser range finder observation names a point *somewhere else*. Every rule in
+the viewer up to now assumed a location vector in a record described the system
+that published it, so the reference node's TruPulse output drew the range finder
+itself sitting on top of whatever it was ranging to, and nothing joined the two.
+
+### Added
+
+**The `.target` role** (`OSHiOS/Viewer/DatastreamRole.swift`). Checked between
+video and location, so it decides a record before the location rule can claim
+it. It fires when a location vector resolves and either the vector is named or
+defined as a target, or a Quantity *beside* it is a range, a distance or a slant
+range. `TargetPaths` carries the target's coordinates plus the range, azimuth,
+elevation and source-identifier paths when the record has them — the reference
+node's `targetLoc` stream has none of them, publishing the numbers on a sibling
+datastream instead, so all four are optional by design.
+
+The rule order is now video → target → location → orientation → bearing → chart
+→ status → timeseries → generic. A record with an azimuth and **no** location
+vector is still a `.bearing`, asserted against both the Kraken DOA fixture and a
+synthetic azimuth-plus-range record: the new rule adds a way for a location
+vector not to be a position and takes nothing away from direction finding.
+
+Range keywords are matched as whole tokens rather than as substrings, whatever
+their length, via a new `firstLeaf(in:matchingAnyToken:)`. "range" is five
+characters and a substring match finds it inside `AntennaArrangement`, which
+would have reclassified KrakenSDR's settings dump as a laser range finder.
+
+**`TargetSourceResolver`** (`OSHiOS/Viewer/TargetSourceResolver.swift`). A pure
+function from an observation, its owner system and the loaded system list to the
+system the target was observed *from*, which is where the line starts. Four
+rules: an identifier stated in the record (matched against every system's id,
+uid — including as a suffix, since a driver writes the tail it knows — and name,
+with this device as a candidate); a `parent@id` link; the owner itself when it
+has a position; and, only when none of those placed anything, a shared
+eight-character-or-longer token between two systems' UIDs, ranked by how many
+colon-separated segments the two share and on a tie by which candidate's UID
+says the least beyond them.
+
+That last rule is the one the reference node needs and the one no node states.
+Its range finder registers as `urn:lasertech:trupulse360:7ae57419dd427e4c:replay`
+and the phone carrying it as `urn:osh:android:7ae57419dd427e4c:droid2:replay`:
+no parent link, no subsystem entry, no identifier in the record, and a
+sixteen-character device id in common. It is consulted last, only for an owner
+with no position of its own, and ranks candidates on `hasPosition` rather than
+on the caller's position lookup, so which system wins stays a pure function of
+the list.
+
+**Target rendering** (`COPMapAnnotations.swift`, `SystemMapView.swift`). A red
+`plus.viewfinder` marker at the target, never rotated, labelled "412 m @ 087°"
+when the record carries range and azimuth, with an `ActivityDot` from the
+stream's freshness; and a straight red 2 pt `MapPolyline` from the source's
+*current* position, so the origin follows the source when it moves. Both ends
+are known, so unlike a line of bearing it needs no spherical projection. The
+line fades after 60 seconds and is never removed, on `BearingStyle`'s own clock,
+because a designation is an event like a detection is.
+
+Only the latest target per (datastream, entity) is drawn. A "Target history"
+layer — off by default — adds the last 20 designations as small dots with no
+lines.
+
+**The `.target` card** (`DatastreamCard.swift`). `TargetSummaryView`: range,
+azimuth, elevation, the target's coordinates, the source system's name and a
+prominent "as of". Tapping the source name sends the user to the map with that
+marker selected, through a new `TabRouter.showOnMap(markerId:)`. The systems
+needed to name a source are lent to the card by the host — `TargetCardContext`,
+passed by the COP map's marker sheet and by the systems list through
+`SystemDashboardView(peers:)` — rather than loaded a second time.
+
+**Fixtures `lrf-target` and `lrf-range`.** The reference node's TruPulse 360
+outputs, with `system.json` and `subsystems.json` for the range finder *and* for
+the Android phone it is carried by. The empty subsystem collections are captured
+rather than omitted, because "the range finder is not a subsystem of the phone"
+is the fact the resolver's fourth rule exists for.
+
+### Changed
+
+`RemoteDatastream.embeddedPosition` is nil for a `.target` stream, as it already
+was for `.location` — the coordinates are not this system's, and treating them
+as one is exactly the bug being fixed. `EntityKeyInference` now groups `.target`
+streams too, excluding the source-identifier field from the candidates: it names
+who was looking, not what was looked at. `SystemLiveSession` bootstraps a
+`.target` stream with `limit: 1` of any age, the plan a `.bearing` stream gets.
+`COPMapModel` keeps a target-carrying system live and fetches its archived
+target even when the system has no position of its own, and its three copies of
+"does this datastream draw on the map" are now one `drawsOnMap` predicate.
+
+The Kraken line of bearing is unchanged in every respect, and
+`DatastreamRoleTests.targetRuleChangesNothingElse` asserts the role of every
+other captured fixture.
+
+### Fixed
+
+`LiveNodeViewerTests.directionFindingStationRenders` required every system with
+a bearing output to have a position, which only held because the range finder's
+target was being read as its own position. It now asserts the honest
+consequence: nothing locates such a system, so it gets no marker and no line —
+a bearing line needs an origin.
+
+`NodeBrowseUITests` guarded on `OSH_NODE` with `XCTUnwrap`, which *fails* rather
+than skips, so the UI test target reported a broken test on every run of the
+default fixture-only suite. It throws `XCTSkip` now, as its own header always
+said it did.
+
+Two suites in `MarkerClusteringTests` are `@MainActor`, which is where the types
+they exercise live: `DeviceLayer` is isolated outright and `SystemMapView`'s
+statics inherit it from `View`. Twenty-one Swift 6 concurrency warnings, gone.
+
+---
+
+## Pass 3c — the common operating picture
+
+The viewer stops being a set of per-system pages. Three tabs now answer one
+question each about the *whole* node — where is everything, what can everything
+see, what is everything — and a camera that accepts commands can be driven from
+inside the app.
+
+Built and verified against a live node holding thirteen systems, six control
+streams and two Axis PTZ cameras. The default test suite still runs from the
+committed fixtures alone and touches no network.
+
+### Added
+
+**System activity** (`OSHiOS/Viewer/SystemActivity.swift`,
+`ActivityTracker.swift`). One freshness picture, shared by every surface:
+`.live` at five minutes, `.stale` at thirty, `.offline` beyond. Derived in three
+layers — a `DatastreamSummary`'s reported time range classifies a whole node
+without opening a stream, arriving observations promote a system in real time,
+and this device is live by definition while its session streams. A range ending
+in `now` or `latest` means data is flowing and counts as live, which is what
+makes a replay-backed node read as live rather than as an archive. A 30-second
+timer re-evaluates everything, because a system that goes quiet produces nothing
+to notice it with. Thresholds live in `ActivityThresholds` and nowhere else.
+
+**`ActivityDot`** (`osh-ios/Views/Shared/ActivityDot.swift`). Green, amber, red,
+with an accessibility label and an optional "12 min ago". Drawn on map markers,
+systems-list rows, dashboard card headers and video-wall tiles — one view rather
+than four coloured circles, so they cannot disagree.
+
+**The common operating picture** (`osh-ios/Views/Map/COPMapView.swift`,
+`COPMapModel.swift`, `COPMapAnnotations.swift`, `DeviceLayer.swift`). One map.
+This device's track, fix and accuracy circle are drawn beside every positioned
+system on the node, with bearing lines and multi-entity markers. Layers — this
+device, node systems, tracks, bearing lines, labels — and the live-updates
+switch live in a toolbar menu and persist in `AppConfig.mapLayers`. Tapping this
+device's marker follows it; tapping a system's opens its cards and a link to its
+dashboard.
+
+**The video wall** (`osh-ios/Views/Video/`). Every video datastream on the node
+in a grid — two up in portrait, three across in landscape — with this device's
+camera preview as the first tile. At most four MJPEG streams play at once and
+the fifth pauses the longest-playing one, round-robin, because the user tapping
+a fifth tile wants that tile. Autoplay defaults to WiFi-only, decided by
+`NetworkPathObserver` over `NWPathMonitor`. Tapping a tile opens a full-screen
+player.
+
+**PTZ control** (`OSHiOS/Viewer/Control/PTZCapability.swift`,
+`osh-ios/Views/Shared/PTZControlView.swift`). A control stream whose parameters
+are a `DataChoice` carrying a relative or absolute pan/tilt pair is recognised
+as a camera and given a D-pad, a zoom pair, a preset field and an absolute
+panel — overlaid on the full-screen player and available on the dashboard. The
+pad auto-repeats while held, and never has more than one command in flight: a
+camera sent a move every 200 ms builds a queue it works through long after the
+finger comes off. Detection reads definitions before names, exactly as
+`DatastreamRole` does; the rules are in `ROLES.md`.
+
+**`CommandClient` and `CommandBody`** (`OSHiOS/Client/`). `POST
+/controlstreams/{id}/commands` with bodies built as ordered strings, never by
+`JSONEncoder` — the node reads a record's fields in schema order and answers 400
+for anything else. The verified envelope, every captured request and response,
+and the endpoints that turn out not to exist are documented in
+`OSHiOS/Client/COMMANDS.md`.
+
+**Control streams resolved, not counted.** `RemoteSystem.controlStreams` now
+carries each stream's decoded parameters schema and its `PTZCapability`;
+`controlStreamCount` became a computed property so every existing call site goes
+on meaning what it meant.
+
+**Marker grouping** (`osh-ios/Views/Map/MarkerClustering.swift`,
+`osh-ios/Views/Shared/ClusterMarkerView.swift`). Markers closer together than a
+touch target are drawn as one bubble with a count, and the grouping dissolves as
+the camera zooms in — the cell size is derived from the map's span and its size
+in points, so nothing in the app has a notion of "zoom level". Tapping a bubble
+zooms to fit its members; a group whose members share one coordinate exactly,
+which no zoom can separate, opens a list instead. This device is never grouped.
+
+The grouping is greedy rather than a grid, because a grid has an artifact the
+user sees at once: two markers a hair apart either side of a cell boundary stay
+separate, so pins merge and split while panning. It also replaces most of what
+decimation was doing — the cap rises from 100 markers to 400 when grouping is
+on, because grouping breaks the link between markers held and annotations drawn.
+
+**`MarkerView`** (`osh-ios/Views/Shared/`). Replaces `HeadingMarker`. A
+role-tinted disc with the system's glyph, an `ActivityDot` fused to its top
+right, and an arrowhead travelling round a ring *outside* the disc — so the
+glyph stays upright. The old marker rotated the whole disc, which drew a camera
+pointing south-west upside down.
+
+### Changed
+
+**Tabs.** Live, Video, Map, Systems, Logs, Settings. The Camera tab is the video
+wall's first tile and pushes to `DeviceCameraView` for its encoder settings; the
+Node tab is the Systems tab's header. Both were a single system's view of a
+question the whole node should answer.
+
+**Systems tab** (`SystemsTabView`). The old Node tab and the old system browser,
+merged: server picker, connectivity, registration and publisher counters above,
+every system below — sorted live-first then alphabetically, filterable by All /
+Live only / With position / With video / With controls, with this device as the
+first row. Systems load eagerly rather than per-row, because sorting by
+freshness and filtering by "has video" both need the detail before the row is
+drawn.
+
+**`SystemDashboardView`** keeps its role as the per-system drill-down and stops
+being the primary way to see anything. Control-stream cards come first on it: a
+camera you can move is what you opened the screen for.
+
+**Dashboard card headers** show data freshness rather than socket state. The
+socket is still reported, in words, and only when it is worth saying — a stream
+that is happily streaming is worth nothing at all.
+
+**Map framing ignores Null Island.** Exactly `(0, 0)` no longer gets a vote on
+where the camera opens when any real coordinate exists. The reference node's
+second Axis camera registers itself there, and including it stretched the frame
+from Alabama to the Gulf of Guinea. The marker is still drawn.
+
+**`SystemGlyph`** gained the tint table that lived in the map's annotation code,
+so a camera is the same colour on the map, in the list and on the wall.
+`RemoteSystemLoader.loadAll` gained the load-a-whole-node task group that all
+three surfaces had grown their own copy of. `SWESchemaDecoder` accepts
+`parametersSchema` alongside `paramsSchema` and `recordSchema` — the same
+document under two different `commandFormat` values.
+
+### Removed
+
+`NodeTabView`, `NodeMapView`, `NodeMapModel`, `HeadingMarker` and
+`TrackMapView`. The first four were renamed or absorbed; `TrackMapView` was the
+device-only map, and its accuracy circle and follow camera moved into
+`SystemMapView` so the COP could draw both halves at once.
+
+### Verified against the live node
+
+The command envelope was determined empirically — the node serves no OpenAPI
+document any of `/api/openapi`, `/api/api-docs` or `/api/openapi.json` will
+return. Authorised small moves only, ending where they started:
+
+```
+Start position: 130.0
+POST {"parameters":{"rpan":3.0}}   → 200 COMPLETED
+Position after +3°: 133.0
+POST {"parameters":{"rpan":-3.0}}  → 200 COMPLETED
+Position after return: 130.0
+```
+
+Three node behaviours worth knowing, all captured in `COMMANDS.md`: an OSH node
+serves its HTML admin console — and demands a login — for API paths requested
+without an explicit `Accept` header, so a 401 is often a missing header rather
+than a missing password; there is no per-command resource, and the control
+stream retains exactly one command, so a status lookup can only ever confirm the
+last command sent; and a partial or reordered record body is a 400 naming the
+field the parser wanted next.
+
+---
+
 ## Pass 3b — the viewer
 
 Systems discovered on a node are now matched to visualisations **purely from

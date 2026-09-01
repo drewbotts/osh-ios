@@ -191,25 +191,36 @@ struct DatastreamSummary: Codable, Identifiable, Hashable, Sendable {
 
 // MARK: - ControlStreamSummary
 
-/// A control stream, as much of one as a read-only viewer needs.
+/// A control stream: what a system will accept as a command.
 ///
-/// Pass 4 adds command encoding and a params schema; until then this exists so
-/// the browser can list what a system accepts rather than silently omitting it.
+/// `controlledProperties` is deliberately not modelled. The reference node
+/// repeats every definition inside the params schema there, once per choice
+/// item and once more per nested record field, so it carries no information the
+/// decoded schema does not already have in a usable shape — and decoding an
+/// array of objects the app would never read is exactly the kind of tolerance
+/// that turns one unfamiliar key into a lost control stream. It is skipped, not
+/// rejected.
 struct ControlStreamSummary: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let inputName: String?
     let systemId: String?
+    let validTime: [String]?
 
-    init(id: String, name: String, inputName: String? = nil, systemId: String? = nil) {
+    init(id: String,
+         name: String,
+         inputName: String? = nil,
+         systemId: String? = nil,
+         validTime: [String]? = nil) {
         self.id = id
         self.name = name
         self.inputName = inputName
         self.systemId = systemId
+        self.validTime = validTime
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, inputName
+        case id, name, inputName, validTime
         case label
         case systemId   = "system@id"
         case systemLink = "system@link"
@@ -225,6 +236,7 @@ struct ControlStreamSummary: Codable, Identifiable, Hashable, Sendable {
             ?? self.id
         self.systemId = try container.decodeFlexibleString(forKey: .systemId)
             ?? container.decodeLinkHref(forKey: .systemLink).map(ResourceLink.lastPathComponent)
+        self.validTime = try container.decodeIfPresent([String].self, forKey: .validTime)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -233,6 +245,36 @@ struct ControlStreamSummary: Codable, Identifiable, Hashable, Sendable {
         try container.encode(name, forKey: .name)
         try container.encodeIfPresent(inputName, forKey: .inputName)
         try container.encodeIfPresent(systemId, forKey: .systemId)
+        try container.encodeIfPresent(validTime, forKey: .validTime)
+    }
+}
+
+// MARK: - CommandSummary
+
+/// One command already issued on a control stream.
+///
+/// The only way to read a command's status on the reference node: there is no
+/// `/controlstreams/{id}/commands/{commandId}` resource — it answers 404 — so a
+/// status check is a listing and a match on `id`. See COMMANDS.md.
+struct CommandSummary: Decodable, Identifiable, Sendable {
+    let id: String
+    let controlStreamId: String?
+    let issueTime: String?
+    let sender: String?
+    let currentStatus: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, issueTime, sender, currentStatus
+        case controlStreamId = "controlstream@id"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeFlexibleString(forKey: .id) ?? ""
+        self.controlStreamId = try container.decodeFlexibleString(forKey: .controlStreamId)
+        self.issueTime = try container.decodeFlexibleString(forKey: .issueTime)
+        self.sender = try container.decodeFlexibleString(forKey: .sender)
+        self.currentStatus = try container.decodeFlexibleString(forKey: .currentStatus)
     }
 }
 

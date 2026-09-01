@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - SystemGlyph
 //
@@ -13,6 +14,7 @@ enum SystemGlyph {
     static func symbol(for role: DatastreamRole) -> String {
         switch role {
         case .video:       return "video.fill"
+        case .target:      return "scope"
         case .location:    return "location.north.line.fill"
         case .orientation: return "gyroscope"
         case .bearing:     return "dot.radiowaves.left.and.right"
@@ -21,6 +23,52 @@ enum SystemGlyph {
         case .status:      return "gearshape.2"
         case .generic:     return "shippingbox"
         }
+    }
+
+    /// The glyph a *target* is drawn with — the point a `.target` stream
+    /// designates, not the system that designated it.
+    ///
+    /// Separate from `symbol(for:)` because one `.target` datastream produces
+    /// two things on the map with different meanings: a scope on the range
+    /// finder's own card and row, and a crosshair out where it is looking.
+    static let targetMarkerSymbol = "plus.viewfinder"
+
+    // MARK: Tints
+
+    /// The colour a role is drawn in, everywhere it is drawn.
+    ///
+    /// Lived in the map's annotation code until the marker redesign, the
+    /// systems list and the video wall all needed it. One table is the whole
+    /// point: a camera that is indigo on the map and purple in the list reads
+    /// as two kinds of thing.
+    ///
+    /// Exhaustive by construction — a `switch` with no `default`, so adding a
+    /// role is a compile error here rather than a system that silently draws
+    /// grey.
+    static func tint(for role: DatastreamRole) -> Color {
+        switch role {
+        case .video:       return .indigo
+        case .target:      return .red
+        case .location:    return .blue
+        case .orientation: return .teal
+        case .bearing:     return .orange
+        case .chart:       return .purple
+        case .timeseries:  return .green
+        case .status:      return .gray
+        case .generic:     return .secondary
+        }
+    }
+
+    /// The colour a whole system is drawn in.
+    ///
+    /// Weather takes teal for the same reason it takes a cloud glyph: a Tempest
+    /// station is a `.timeseries` like a battery monitor is, and only one of
+    /// them should look like weather on a map.
+    static func tint(for system: RemoteSystem) -> Color {
+        if isWeather(system), weakRoles.contains(system.primaryRole.label) {
+            return .teal
+        }
+        return tint(for: system.primaryRole)
     }
 
     /// SF Symbol for a whole system.

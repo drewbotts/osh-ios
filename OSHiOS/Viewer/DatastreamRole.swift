@@ -14,6 +14,9 @@ import Foundation
 // for how to add one.
 
 enum DatastreamRole: Equatable, Sendable {
+    /// A point observed from somewhere else — a laser range finder's target.
+    /// The position in the record is the *target's*, never the system's.
+    case target(TargetPaths)
     /// A position, optionally with a heading to rotate its marker by.
     case location(LocationPaths, headingPath: FieldPath?)
     /// An attitude — quaternion or Euler angles.
@@ -35,7 +38,8 @@ enum DatastreamRole: Equatable, Sendable {
     /// first. Higher wins.
     var priority: Int {
         switch self {
-        case .video:       return 7
+        case .video:       return 8
+        case .target:      return 7
         case .location:    return 6
         case .orientation: return 5
         case .bearing:     return 4
@@ -49,6 +53,7 @@ enum DatastreamRole: Equatable, Sendable {
     /// A one-word name for the role, for badges and log lines.
     var label: String {
         switch self {
+        case .target:      return "target"
         case .location:    return "location"
         case .orientation: return "orientation"
         case .bearing:     return "bearing"
@@ -122,6 +127,30 @@ struct OrientationPaths: Equatable, Sendable {
     }
 }
 
+// MARK: - TargetPaths
+
+/// Where a designated target sits, and what the record says about getting
+/// there.
+///
+/// The distinction from `LocationPaths` is whose position it is. A location
+/// record says "I am here"; a target record says "the thing I am pointing at is
+/// there" — so the coordinates must never become the system's own marker, and
+/// the interesting drawing is the line between the two.
+struct TargetPaths: Equatable, Sendable {
+    /// The target point.
+    let location: LocationPaths
+    /// Range/distance to the target, when the record carries one.
+    let range: FieldPath?
+    /// Azimuth to the target, degrees from true north.
+    let azimuth: FieldPath?
+    /// Elevation or inclination of the line of sight.
+    let elevation: FieldPath?
+    /// A Text or Category naming the system the target was observed *from*.
+    /// nil when the record does not say — which is the common case, and why
+    /// `TargetSourceResolver` exists.
+    let sourceIdPath: FieldPath?
+}
+
 // MARK: - BearingPaths
 
 /// A line of bearing: the angle, and how much to trust it.
@@ -166,11 +195,26 @@ enum DatastreamRoleInference {
                                                     datastreamName: datastreamName)
         let bearing = bearingPaths(schema: schema, leaves: leaves)
 
-        // 2 ── location.
+        // 2 ── target.
+        //
+        // Before location, and deliberately: a laser range finder's output
+        // resolves as a location vector, and a viewer that stopped there would
+        // pin the range finder itself on top of whatever it was ranging to.
+        // Settings-flavoured records are excluded for the same reason rule 3
+        // excludes them — a configuration dump is not an observation of
+        // anything — which is also what keeps KrakenSDR's `stationConfig`
+        // position out of here.
+        if let resolved = LocationPaths.resolveDetailed(in: schema),
+           !settingsFlavoured,
+           let target = targetPaths(schema: schema, resolved: resolved, leaves: leaves) {
+            return .target(target)
+        }
+
+        // 3 ── location.
         //
         // Two records are excluded even though a location vector resolves. A
         // settings record's position is *reported*, not observed — it is the
-        // station's own fix, and rule 6 is the better description of the
+        // station's own fix, and rule 7 is the better description of the
         // stream; RemoteDatastream.embeddedPosition carries the position.
         //
         // A direction-finding record is excluded for the same reason: KrakenSDR
@@ -184,38 +228,38 @@ enum DatastreamRoleInference {
             return .location(resolved.paths, headingPath: heading)
         }
 
-        // 3 ── orientation.
+        // 4 ── orientation.
         if let orientation = orientationPaths(schema: schema) {
             return .orientation(orientation)
         }
 
-        // 4 ── bearing.
+        // 5 ── bearing.
         if let bearing {
             return .bearing(bearing)
         }
 
-        // 5 ── chart.
+        // 6 ── chart.
         if let chart = chartPaths(leaves: leaves) {
             return .chart(chart)
         }
 
-        // 6 ── status.
+        // 7 ── status.
         if settingsFlavoured {
             return .status
         }
 
-        // 7 ── timeseries.
+        // 8 ── timeseries.
         let hasTime = leaves.contains { $0.component is TimeComponent }
         let hasNumber = leaves.contains { $0.component is Quantity || $0.component is SWECount }
         if hasTime && hasNumber {
             return .timeseries
         }
 
-        // 8 ── generic.
+        // 9 ── generic.
         return .generic
     }
 
-    // MARK: Rule 2/6 — settings flavour
+    // MARK: Rule 3/7 — settings flavour
 
     /// Whether a record reads as configuration rather than measurement.
     ///
@@ -236,7 +280,79 @@ enum DatastreamRoleInference {
         return nestedRecords >= 3 && topLevelQuantities <= 1
     }
 
-    // MARK: Rule 3 — orientation
+    // MARK: Rule 2 — target
+
+    /// A designated target point, or nil when the location vector is the
+    /// system's own position.
+    ///
+    /// Two ways to qualify, and both are about the record saying so rather than
+    /// a driver being recognised:
+    ///
+    /// * the location vector itself is *named* or *defined* as a target —
+    ///   `targetLoc`, "Target Location", `FeatureOfInterestLocation` labelled
+    ///   "Target";
+    /// * a Quantity **beside** it is a range, a distance or a slant range,
+    ///   which is what a range finder measures and what a position record
+    ///   never carries.
+    ///
+    /// The sibling restriction on the second test is deliberate. A range three
+    /// records away describes something else, and a rule that scanned the whole
+    /// tree would pull in any settings dump that happened to state a position
+    /// and a distance in unrelated sub-records.
+    ///
+    /// The range, azimuth, elevation and source-identifier paths are only
+    /// *carried*, never part of the match, so they are searched more widely —
+    /// siblings first, then the record — because getting one of them wrong
+    /// costs a label, not a classification.
+    private static func targetPaths(schema: DataRecord,
+                                    resolved: LocationPaths.Resolved,
+                                    leaves: [SchemaWalker.Leaf]) -> TargetPaths? {
+
+        // The vector's own path is its latitude's parent; its field sits among
+        // the siblings the resolver handed back.
+        let vectorPath = FieldPath(components: Array(resolved.paths.latitude.components.dropLast()))
+        let vectorName = vectorPath.lastComponent
+        let vector = resolved.siblings.first { $0.name == vectorName }?.component
+
+        let vectorIsTarget = [vectorName, vector?.definition, vector?.label]
+            .compactMap { $0 }
+            .contains { matchesToken($0, "target") }
+
+        /// Quantities beside the vector, the vector's own coordinates excluded.
+        let siblingQuantities = resolved.siblings
+            .filter { $0.component is Quantity }
+            .map { SchemaWalker.Leaf(path: resolved.containerPath.appending($0.name),
+                                     component: $0.component) }
+
+        let siblingRange = firstLeaf(in: siblingQuantities, matchingAnyToken: Keywords.range)
+        guard vectorIsTarget || siblingRange != nil else { return nil }
+
+        /// Every Quantity in the record except the target's own coordinates —
+        /// an altitude is not an elevation angle.
+        let outsideVector = leaves.filter {
+            !$0.path.components.starts(with: vectorPath.components)
+        }
+        let quantities = outsideVector.filter { $0.component is Quantity }
+
+        func quantity(_ keywords: [String]) -> FieldPath? {
+            (firstLeaf(in: siblingQuantities, matchingAnyToken: keywords)
+                ?? firstLeaf(in: quantities, matchingAnyToken: keywords))?.path
+        }
+
+        let identifiers = outsideVector.filter {
+            $0.component is SWEText || $0.component is SWECategory
+        }
+
+        return TargetPaths(
+            location: resolved.paths,
+            range: siblingRange?.path ?? quantity(Keywords.range),
+            azimuth: quantity(Keywords.targetAzimuth),
+            elevation: quantity(Keywords.elevation),
+            sourceIdPath: firstLeaf(in: identifiers,
+                                    matchingAnyToken: Keywords.sourceIdentity)?.path)
+    }
+
+    // MARK: Rule 4 — orientation
 
     /// A quaternion or Euler triple, wherever it sits.
     ///
@@ -319,7 +435,7 @@ enum DatastreamRoleInference {
         return .euler(heading: heading, pitch: pitch, roll: roll)
     }
 
-    // MARK: Rule 4 — bearing
+    // MARK: Rule 5 — bearing
 
     private static func bearingPaths(schema: DataRecord,
                                      leaves: [SchemaWalker.Leaf]) -> BearingPaths? {
@@ -336,7 +452,7 @@ enum DatastreamRoleInference {
         return BearingPaths(angle: angle.path, quality: quality?.path)
     }
 
-    // MARK: Rule 5 — chart
+    // MARK: Rule 6 — chart
 
     /// Numeric DataArrays big enough or open-ended enough to be worth plotting.
     ///
@@ -410,6 +526,25 @@ enum DatastreamRoleInference {
         return nil
     }
 
+    /// As `firstLeaf(in:matchingAny:)`, but every keyword must match a whole
+    /// token however long it is.
+    ///
+    /// The target rule needs this. "range" is five characters, so the substring
+    /// rule below would happily find it inside "AntennaArrangement" and
+    /// classify a KrakenSDR settings dump as a laser range finder.
+    static func firstLeaf(in leaves: [SchemaWalker.Leaf],
+                          matchingAnyToken keywords: [String]) -> SchemaWalker.Leaf? {
+        for keyword in keywords {
+            if let leaf = leaves.first(where: { matchesToken($0.component.definition, keyword) }) {
+                return leaf
+            }
+            if let leaf = leaves.first(where: { matchesToken($0.path.lastComponent, keyword) }) {
+                return leaf
+            }
+        }
+        return nil
+    }
+
     /// Substring for long keywords, whole-token for short ones.
     ///
     /// "lob", "doa" and "id" are three and two letters and would otherwise hit
@@ -419,6 +554,12 @@ enum DatastreamRoleInference {
     private static func matches(_ text: String?, _ keyword: String) -> Bool {
         guard let text else { return false }
         if keyword.count > 4 { return text.localizedCaseInsensitiveContains(keyword) }
+        return tokens(of: text).contains(keyword.lowercased())
+    }
+
+    /// Whole-token match, whatever the keyword's length.
+    static func matchesToken(_ text: String?, _ keyword: String) -> Bool {
+        guard let text else { return false }
         return tokens(of: text).contains(keyword.lowercased())
     }
 
@@ -452,6 +593,19 @@ enum DatastreamRoleInference {
         static let orientation = ["orientation", "quaternion"]
         static let bearing = ["doa", "lineofbearing", "lob", "bearing", "azimuth",
                               "angleofarrival", "aoa"]
+        /// Rule 2's structural test, and the range a target card shows.
+        /// Whole-token matched — see `firstLeaf(in:matchingAnyToken:)`.
+        static let range = ["slantrange", "range", "distance"]
+        /// The azimuth *to a target*, which is the same word a LOB uses. Rule 2
+        /// runs first, so a record with both a target vector and an azimuth is
+        /// a target; one with only the azimuth is still a bearing.
+        static let targetAzimuth = ["azimuth", "bearing", "heading"]
+        static let elevation = ["elevation", "inclination"]
+        /// Who observed the target. Ordered strongest-first: "system" and "uid"
+        /// appear in plenty of fields that name something else, so they only
+        /// get a turn once the explicit spellings have missed.
+        static let sourceIdentity = ["source", "origin", "observer", "platform",
+                                     "system", "uid"]
         static let quality = ["confidence", "power", "quality", "rssi"]
         static let axis = ["frequency", "axis", "bins", "time"]
         /// Ordered strongest-first: "id" matches half the identifiers in a

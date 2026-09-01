@@ -1,0 +1,39 @@
+{
+  "type": "Feature",
+  "id": "02cfdsfiopmg",
+  "geometry": null,
+  "properties": {
+    "uid": "urn:osh:android:7ae57419dd427e4c:droid2:replay",
+    "featureType": "http://www.w3.org/ns/sosa/Sensor",
+    "name": "Android",
+    "validTime": [
+      "2026-08-27T01:37:57.306Z",
+      "now"
+    ]
+  },
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02cfdsfiopmg",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in SensorML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02cfdsfiopmg?f=sml3",
+      "type": "application/sml+json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02cfdsfiopmg?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "datastreams",
+      "title": "List of system datastreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02cfdsfiopmg/datastreams?f=json",
+      "type": "application/json"
+    }
+  ]
+}

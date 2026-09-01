@@ -1,9 +1,11 @@
 # OSH iOS
 
-An iOS sensor client for [OpenSensorHub](https://opensensorhub.org). It registers
-the phone with an OSH node as an OGC **Connected Systems** system, registers one
+An iOS client for [OpenSensorHub](https://opensensorhub.org). It registers the
+phone with an OSH node as an OGC **Connected Systems** system, registers one
 datastream per enabled sensor, and streams observations to the node for as long
-as a session runs.
+as a session runs — and it reads the same node back: every system it holds on
+one map, every camera on one wall, and a pan/tilt/zoom camera driven from a
+D-pad over its own picture.
 
 It is a port of the `osh-android` sensor driver, and deliberately a faithful one:
 the SWE Common schemas, definition URIs and observation encodings match the
@@ -69,9 +71,23 @@ Read side (`ConnectedSystemsReadClient`):
 GET /systems?limit=N
 GET /systems/{id}
 GET /systems/{id}/datastreams
+GET /systems/{id}/controlstreams
 GET /datastreams/{id}
 GET /datastreams/{id}/schema?obsFormat=<mime>
+GET /controlstreams/{id}/schema?commandFormat=application/swe%2Bjson
+GET /controlstreams/{id}/commands?limit=N
 ```
+
+Command side (`CommandClient`):
+
+```
+POST /controlstreams/{id}/commands   → one command, returns a status report
+```
+
+Every request carries an explicit `Accept`. Without it the reference node serves
+its HTML admin console for these paths and that console demands a login the API
+does not — a 401 from an OSH node is very often a missing `Accept` header rather
+than a missing password.
 
 Scalar observations are posted as `application/swe+json`; video frames as
 `application/swe+binary` (8-byte big-endian timestamp, 4-byte length, then the
@@ -124,10 +140,15 @@ OSHiOS/                     the app's engine — no SwiftUI
 │   ├── ReadModels                  SystemSummary, DatastreamSummary
 │   ├── ObservationStream           live WebSocket subscription, decoded
 │   ├── TimeSynchronizer            reorders observations across datastreams
-│   ├── NodeConnection              one node: read client + write client
+│   ├── CommandClient               POSTs commands; ordered-string bodies
+│   ├── CommandBody                 the command JSON, built key by key
+│   ├── COMMANDS.md                 the verified command envelope, captured live
+│   ├── NodeConnection              one node: read + write + command clients
 │   ├── NodeConnectionStore         rebuilds the connection when the server changes
+│   ├── NetworkPathObserver         WiFi or cellular, for video autoplay
 │   ├── URLComponents+MediaType     percent-encodes "+" in a media-type query
-│   └── NoRedirectDelegate          shared by both clients
+│   ├── ISO8601DateFormatter+Flexible  parses both of the node's timestamp forms
+│   └── NoRedirectDelegate          shared by all three clients
 ├── SWE/                    the schema model and everything derived from it
 │   ├── Model/                      DataComponent and friends, FieldPath,
 │   │                               FieldValue, ParsedObservation, Observation,
@@ -148,7 +169,11 @@ OSHiOS/                     the app's engine — no SwiftUI
 │   ├── RemoteSystem                a node system resolved far enough to draw
 │   ├── RemoteSystemLoader          actor: schemas concurrently, 5-min cache
 │   ├── SystemLiveSession           one system watched live, entity-bucketed
-│   ├── SystemGlyph                 role → SF Symbol, one table for every screen
+│   ├── SystemActivity              live / stale / offline, and the thresholds
+│   ├── ActivityTracker             one freshness picture, shared by every screen
+│   ├── Control/PTZCapability       command schema → pan/tilt/zoom, or nothing
+│   ├── SystemGlyph                 role → SF Symbol and tint, one table for
+│   │                               every screen
 │   ├── BearingGeometry             geodesic LOB endpoints; BearingStyle
 │   ├── WaterfallBuffer             SDR waterfall pixels, no SwiftUI
 │   ├── Video/MJPEGDecoder          JPEG blocks → CGImage, off the main actor
@@ -173,17 +198,101 @@ osh-ios/                    the SwiftUI app
 ├── ContentView             the tab bar
 └── Views/
     ├── Live/               session bar + schema-driven SensorCard
-    ├── Camera/             preview and encoder settings
-    ├── Browser/            SystemBrowserView, SystemDashboardView,
-    │                       DatastreamCard — the role-driven card grid
-    ├── Map/                TrackMapView (this device) + NodeMapView (the node)
-    ├── Node/               server, registration, datastreams, browser entry
+    ├── Camera/             DeviceCameraView: preview and encoder settings,
+    │                       pushed from the video wall's first tile
+    ├── Video/              the video wall: VideoWallView/Model, the full-screen
+    │                       NodeVideoPlayerView with its PTZ overlay
+    ├── Browser/            SystemsTabView (the systems surface),
+    │                       SystemDashboardView, DatastreamCard,
+    │                       ControlStreamCard — the role-driven card grid
+    ├── Map/                the COP: COPMapView/Model/Annotations, DeviceLayer,
+    │                       MarkerClustering
+    ├── Node/               DeviceDatastreamsView, DatastreamDetailView,
+    │                       SchemaTreeView — this device's side of the node
     ├── Shared/             FieldRowsView, LocationSummaryView, VideoBadgeView,
-    │                       SystemMapView, HeadingMarker, HeadingDialView,
-    │                       WaterfallView, MJPEGView
+    │                       SystemMapView, MarkerView, ClusterMarkerView,
+    │                       ActivityDot,
+    │                       PTZControlView, HeadingDialView, WaterfallView,
+    │                       MJPEGView
     ├── Logs/               in-app log tail
     └── Settings/           system name, servers, sensors, rates, behavior
 ```
+
+### The three surfaces
+
+Six tabs — **Live, Video, Map, Systems, Logs, Settings** — and three of them are
+the same node seen three ways.
+
+**Map is the common operating picture.** One map, not two: this device's track
+and fix are drawn beside every positioned system on the node, with bearing lines
+and multi-entity markers. There is no This Device / Node switch, because the
+value of a node is that a phone's track and a direction finder's line of bearing
+are *one* picture. A toolbar menu toggles the layers — this device, node
+systems, tracks, bearing lines, labels — and the live-updates switch, all
+persisted in `AppConfig.mapLayers`. Tapping a marker opens the system's cards
+and a link to its dashboard; tapping this device's marker follows it.
+
+**Video is the wall.** Every video datastream on the node, two up in portrait
+and three across in landscape, with this device's own camera preview as the
+first tile. At most four MJPEG streams play at once — the fifth pauses the one
+that has been playing longest — and autoplay defaults to WiFi-only, checked
+through `NWPathMonitor`. Tapping a tile opens a full-screen player; if that
+camera has a recognised PTZ control stream, the D-pad appears over the picture.
+
+**Systems is the list.** Server picker, connectivity, this device's
+registration and the publisher counters at the top; every system below,
+sorted live-first and filterable by All / Live only / With position / With video
+/ With controls. Rows open `SystemDashboardView`, which is still the per-system
+drill-down and is no longer the only way to see anything.
+
+### System activity
+
+Every surface draws the same status dot, from one place.
+
+| State | Meaning |
+|---|---|
+| 🟢 live | newest observation ≤ 5 min old |
+| 🟠 stale | ≤ 30 min |
+| 🔴 offline | > 30 min, or nothing ever observed |
+
+The thresholds live in `ActivityThresholds` and nowhere else — they will become
+a setting. Freshness is derived in three layers: `DatastreamSummary`'s reported
+`phenomenonTimeRange` classifies a whole node without opening a stream (a range
+ending in `now` or `latest` means data is flowing, so it counts as live);
+observations arriving through any `SystemLiveSession` promote their system in
+real time; and this device is live by definition while its session streams. A
+30-second timer re-evaluates everything, because a system that goes quiet
+produces nothing to notice it with.
+
+### Commanding
+
+`PTZCapability.detect` reads a control stream's parameters schema and decides
+whether it describes a pan/tilt/zoom camera — from definitions first
+(`RelativePan`, `Tilt`, `ZoomFactor`, `CameraPresetPositionName`) and item names
+second, exactly as `DatastreamRole` reads an observation schema. A schema with
+neither a relative nor an absolute pan/tilt *pair* is not a PTZ camera, and its
+dashboard card shows the decoded parameter tree read-only instead of a joystick
+that would do nothing.
+
+The command envelope was determined empirically against the reference node and
+is documented in full, with captured requests and responses, in
+`OSHiOS/Client/COMMANDS.md`:
+
+```
+POST /controlstreams/{id}/commands
+Content-Type: application/json
+
+{"parameters":{"rpan":3.0}}
+→ 200 {"command@id":"…","reportTime":"…","statusCode":"COMPLETED",
+       "executionTime":["…","…"]}
+```
+
+The parameters schema is a `DataChoice`, so exactly one item is the sole key of
+`parameters`. `issueTime` is optional and comes first when present. Bodies are
+built as ordered strings by `CommandBody`, never by `JSONEncoder`: the node
+reads a record's fields in the order its schema declares them and answers 400
+for anything else — `{"ptzPos":{"pan":0.0}}` returns *"Expected a name but was
+END_OBJECT at $.parameters.ptzPos.pan"*.
 
 ### Reading a datastream
 
@@ -270,6 +379,14 @@ settings record, at `/stationConfig/location`, with the array heading beside it.
 position) beats `.deployed` (the system resource's own geometry). The marker
 looks different for each, because "we are tracking this" and "someone typed this
 in once" should not read the same. A deployed marker never rotates.
+
+**Markers.** `MarkerView` draws a role-tinted disc with the system's glyph, an
+`ActivityDot` fused to its top right, and — when there is a heading — an
+arrowhead travelling round a ring *outside* the disc. The glyph itself never
+rotates: the previous marker turned the whole disc, which drew a camera pointing
+south-west upside down. Freshness arrives as a value rather than as an
+`@EnvironmentObject`, because a hundred markers each observing the tracker would
+redraw the whole map whenever any one system changed colour.
 
 **SystemLiveSession.** One `ObservationStream` per selected datastream, all of
 them routed through one `TimeSynchronizer` so a video frame and the fix taken at
@@ -364,6 +481,19 @@ writing anything; `capture` writes `osh-iosTests/Fixtures/` and is idempotent.
 set and are never written to any file. See `osh-iosTests/Fixtures/README.md` for
 the layout and what each folder covers.
 
+`LiveCommandTests` moves a real camera, so it needs a second, explicit opt-in on
+top of `OSH_NODE`. It pans three degrees, checks the camera's own position
+output moved, and pans back — issuing the return even when an assertion in
+between fails, so a red test never leaves a camera somewhere nobody asked for:
+
+```bash
+TEST_RUNNER_OSH_NODE=http://host:8080/sensorhub/api \
+TEST_RUNNER_OSH_ALLOW_COMMANDS=1 \
+  xcodebuild -project osh-ios.xcodeproj -scheme osh-ios \
+    -destination 'platform=iOS Simulator,name=iPhone 16' \
+    -only-testing:osh-iosTests/LiveCommandTests test
+```
+
 `SWIFT_STRICT_CONCURRENCY = complete` is on for every target. Keep it that way.
 
 Sensor work needs a real device: the simulator has no camera, no barometer, no
@@ -374,13 +504,14 @@ device motion, and only a simulated location.
 1. **Settings → Servers → +**. Give it a label, the base API URL
    (`http://host:8181/sensorhub/api`), a username and a password. Credentials go
    to the Keychain; everything else to `UserDefaults`.
-2. **Save**, then select the server on the **Node** tab.
+2. **Save**, then select the server on the **Systems** tab.
 3. **Test Connection** — a green check means the node answered and accepted the
    credentials.
 4. **Live → Start Streaming**. The session registers the system, registers a
    datastream per enabled sensor, then starts posting.
-5. The **Node** tab lists the datastreams the node now holds, with live sent /
-   bytes / error counts beside each one that this session is feeding.
+5. **Systems → Registration → This device's datastreams** lists what the node
+   now holds, with live sent / bytes / error counts beside each one this session
+   is feeding.
 
 Plain `http://` to a LAN node works because App Transport Security allows
 arbitrary loads for local addresses; a public node should use HTTPS.
@@ -408,11 +539,34 @@ arbitrary loads for local addresses; a public node should use HTTPS.
 - **H.264 video is not decoded.** MJPEG streams render; an H.264 camera shows a
   placeholder card that reports its arriving frame rate and frame sizes, which
   proves the stream works without pretending to draw it. Pass 3d.
-- **Control streams are listed, never sent.** A commandable system shows how
-  many control streams it has and nothing more. Pass 4.
-- **No map clustering.** SwiftUI's `Map` exposes none on iOS 18, so the node map
-  decimates to the newest 100 markers and says so in its legend rather than
-  quietly truncating a busy anchorage.
+- **Only PTZ cameras can be commanded.** `PTZCapability` recognises pan/tilt/
+  zoom control streams and drives them; every other control structure gets its
+  parameter tree read-only and says "command support for this structure not yet
+  implemented". Nothing guesses at a schema it does not recognise.
+- **Command status is barely readable.** The reference node has no per-command
+  resource and retains exactly one command per control stream, so
+  `getCommandStatus` can only ever confirm the last command sent. It returns nil
+  rather than pretending otherwise.
+- **PTZ presets are a text field, not a menu.** The schema declares a `Text`
+  with no `AllowedTokens`, so the app genuinely does not know what presets a
+  camera has. An empty menu would be a worse lie than an empty field.
+- **The video wall caps at four streams.** A fifth pauses the longest-playing
+  one. The cap is a guess at what a phone tolerates and has not been measured on
+  a device.
+- **Clustering is the app's own, not MapKit's.** SwiftUI's `Map` exposes no
+  clustering on iOS 18, so `MarkerClustering` does it: a greedy pass keyed to
+  the camera's span. It is O(n²) in the markers held, which is nothing at the
+  hundreds a map can hold and would need a grid or a quadtree at tens of
+  thousands.
+- **Re-grouping happens when a gesture ends, not during it.** Re-clustering
+  every frame of a pinch would rebuild every annotation at 60 Hz for a grouping
+  nobody can read mid-gesture. The pins settle when the fingers lift.
+- **A far-flung system still spreads the map.** Grouping fixes markers hiding
+  each other; it cannot fix a node whose systems are genuinely 13,000 km apart.
+  The reference node's KrakenSDR is configured with a static location in central
+  India while everything else is in Alabama, so the initial frame spans both and
+  each site collapses to one bubble. That is correct, and it is also a hint that
+  the map could use a "fit to what is nearby" affordance.
 - **A chart card does not backfill from the archive.** Positions and scalar
   series bootstrap from the last half hour and bearings from their last
   observation, but a spectrum starts empty and fills as frames arrive, so a
@@ -428,9 +582,14 @@ arbitrary loads for local addresses; a public node should use HTTPS.
 
 - **H.264 decoding** (Pass 3d), so the node's cameras render rather than
   reporting their frame rate.
-- **Commands** (Pass 4), so a node can drive the phone rather than only listen
-  to it — the control streams are already listed and their DataChoice params
-  already decode.
+- **More command structures.** PTZ is recognised and driven; the next ones are
+  whatever the schemas on a real deployment turn out to describe. The read side,
+  the envelope and the ordered-body discipline are done.
+- **Commands *to* this device**, so a node can drive the phone rather than only
+  listen to it — the app publishes no control stream of its own yet.
+- **Configurable activity thresholds.** Five minutes is right for a camera and
+  absurd for a tide gauge; `ActivityThresholds` is already the only place that
+  would have to change.
 - **MJPEG** *output* alongside H.264, for clients that cannot decode a bare
   Annex-B stream.
 - **Garmin** wearable sensors as an additional set of outputs.

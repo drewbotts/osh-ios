@@ -316,12 +316,10 @@ actor ConnectedSystemsReadClient {
 
     // MARK: Control streams
 
-    /// Control streams of one system, listed only.
+    /// Control streams of one system.
     ///
-    /// Commanding is Pass 4. Listing them here is what lets the browser say
-    /// "3 control streams" instead of pretending a commandable camera is a
-    /// read-only one. The endpoint is `/controlstreams`; `/controls`
-    /// redirects, and this client refuses redirects on purpose.
+    /// The endpoint is `/controlstreams`; `/controls` redirects, and this
+    /// client refuses redirects on purpose.
     ///
     /// A node that models no commands answers 404, which is "none" rather than
     /// an error worth failing a browse over.
@@ -333,6 +331,55 @@ actor ConnectedSystemsReadClient {
         do {
             let data = try await get(url: url)
             let response: ItemsResponse<ControlStreamSummary> = try decode(data, from: url)
+            return response.items
+        } catch ClientError.httpError(404) {
+            return []
+        }
+    }
+
+    /// GET /controlstreams/{id}/schema — the parameters a command may carry.
+    ///
+    /// Requested as swe+json rather than at the node's default. Both work and
+    /// both decode, but they are not the same document: the default answers
+    /// `{"commandFormat": …, "parametersSchema": …}` while swe+json answers
+    /// `{"paramsSchema": …}`. Asking for the SWE representation explicitly is
+    /// what makes the response the same shape as every other schema this app
+    /// reads, and the default is kept as a fallback for a node that does not
+    /// serve it.
+    func getControlSchemaJSON(controlStreamId: String) async throws -> Data {
+        let schemaURL = baseURL
+            .appendingPathComponent("controlstreams")
+            .appendingPathComponent(controlStreamId)
+            .appendingPathComponent("schema")
+
+        var components = URLComponents(url: schemaURL, resolvingAgainstBaseURL: false)
+        components?.setQueryItemsEncodingPlus(
+            [URLQueryItem(name: "commandFormat", value: Self.sweJSON)])
+
+        if let url = components?.url,
+           let data = try? await get(url: url, accept: "application/json") {
+            return data
+        }
+        return try await get(url: schemaURL, accept: "application/json")
+    }
+
+    /// Commands already issued on a control stream, newest last.
+    ///
+    /// Used for status: the node has no per-command resource. See COMMANDS.md.
+    func listCommands(controlStreamId: String, limit: Int = 20) async throws -> [CommandSummary] {
+        var components = URLComponents(
+            url: baseURL
+                .appendingPathComponent("controlstreams")
+                .appendingPathComponent(controlStreamId)
+                .appendingPathComponent("commands"),
+            resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        guard let url = components?.url else {
+            throw ClientError.invalidURL("controlstreams/\(controlStreamId)/commands")
+        }
+        do {
+            let data = try await get(url: url)
+            let response: ItemsResponse<CommandSummary> = try decode(data, from: url)
             return response.items
         } catch ClientError.httpError(404) {
             return []

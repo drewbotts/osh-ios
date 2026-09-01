@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "id": "03d9tsleg9eg1ctsqra0c04oiq00",
+      "datastream@id": "03d9tsleg9eg",
+      "phenomenonTime": "2026-08-31T15:30:59.010Z",
+      "resultTime": "2026-08-31T15:30:59.010Z",
+      "result": {
+        "location": {"lat": 31.202600148462448,"lon": -89.18193725350112,"alt": 56.38541056867689}
+      }
+    }
+  ]
+}

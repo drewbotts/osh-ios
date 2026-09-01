@@ -35,11 +35,14 @@ enum SWESchemaDecoder {
     /// Three shapes are accepted, all of which the reference node serves:
     ///   • the datastream schema resource — obsFormat + recordSchema (+ recordEncoding)
     ///   • a bare DataRecord
-    ///   • a control stream's schema resource, keyed "paramsSchema"
+    ///   • a control stream's schema resource, keyed "paramsSchema" when asked
+    ///     for as swe+json and "parametersSchema" at the node's default format
     ///
-    /// The last is not an observation schema and this pass implements no
-    /// command support, but decoding it costs nothing and is the only place the
-    /// reference node exposes a DataChoice at all.
+    /// The last is what PTZCapability detects against. Both spellings are
+    /// accepted because they are the same document under two Accept-ish query
+    /// values, and a caller that fell back to the default format would
+    /// otherwise get "no recordSchema, paramsSchema or type key" for a schema
+    /// that is plainly there.
     static func decode(_ data: Data) throws -> DatastreamSchema {
         let root: [String: Any]
         do {
@@ -59,23 +62,28 @@ enum SWESchemaDecoder {
         // A bare component document — the "type" is at the top level.
         if root["type"] != nil {
             let component = try decodeComponent(root, at: rootPath, idIndex: &idIndex)
-            return DatastreamSchema(obsFormat: string(root["obsFormat"]) ?? "",
+            return DatastreamSchema(obsFormat: string(root["obsFormat"])
+                                        ?? string(root["commandFormat"]) ?? "",
                                     recordSchema: asRecord(component,
                                                            name: string(root["name"])),
                                     recordEncoding: nil,
                                     idIndex: idIndex)
         }
 
-        guard let schemaObject = (root["recordSchema"] ?? root["paramsSchema"]) as? [String: Any] else {
+        guard let schemaObject = (root["recordSchema"]
+                                    ?? root["paramsSchema"]
+                                    ?? root["parametersSchema"]) as? [String: Any] else {
             throw SWEDecodeError.malformedTopLevel(
-                "no \"recordSchema\", \"paramsSchema\" or \"type\" key")
+                "no \"recordSchema\", \"paramsSchema\", \"parametersSchema\" or \"type\" key")
         }
 
         let component = try decodeComponent(schemaObject, at: rootPath, idIndex: &idIndex)
         let record = asRecord(component, name: string(schemaObject["name"]))
 
         var encoding: DecodedBinaryEncoding?
-        if let encodingObject = (root["recordEncoding"] ?? root["paramsEncoding"]) as? [String: Any] {
+        if let encodingObject = (root["recordEncoding"]
+                                    ?? root["paramsEncoding"]
+                                    ?? root["parametersEncoding"]) as? [String: Any] {
             encoding = try decodeEncoding(encodingObject)
         }
 
@@ -89,7 +97,8 @@ enum SWESchemaDecoder {
             idIndex = idIndex.mapValues { FieldPath(components: [record.name] + $0.components) }
         }
 
-        return DatastreamSchema(obsFormat: string(root["obsFormat"]) ?? "",
+        return DatastreamSchema(obsFormat: string(root["obsFormat"])
+                                    ?? string(root["commandFormat"]) ?? "",
                                 recordSchema: record,
                                 recordEncoding: encoding,
                                 idIndex: idIndex)

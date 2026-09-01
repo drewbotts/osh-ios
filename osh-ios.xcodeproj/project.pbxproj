@@ -7,8 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3A0OSHW00100000000000001 /* OSHiOSWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3A0OSHW00200000000000001 /* OSHiOSWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3A0OSHPRIV0000000000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3A0OSHPRIV0000000000001 /* PrivacyInfo.xcprivacy */; };
+		3A0OSHPRIV0000000000003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3A0OSHPRIV0000000000001 /* PrivacyInfo.xcprivacy */; };
 		3A0OSHFIXBLD000000000001 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 3A0OSHFIXREF000000000001 /* Fixtures */; };
+		3A0OSHW00100000000000001 /* OSHiOSWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3A0OSHW00200000000000001 /* OSHiOSWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,15 +52,17 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3A0OSHPRIV0000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		3A0OSHVER00000000000003 /* stamp-build-version.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; name = "stamp-build-version.sh"; path = "scripts/stamp-build-version.sh"; sourceTree = "<group>"; };
+		3A0OSHFIXREF000000000001 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = "osh-iosTests/Fixtures"; sourceTree = SOURCE_ROOT; };
 		3A0OSHW00200000000000001 /* OSHiOSWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OSHiOSWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A38D78A2F74157B00D8BF3F /* osh-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "osh-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A38D7972F74157D00D8BF3F /* osh-iosTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "osh-iosTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A38D7A12F74157D00D8BF3F /* osh-iosUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "osh-iosUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		3A0OSHFIXREF000000000001 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = "osh-iosTests/Fixtures"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		3A0OSHFIX00000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		3A0OSHFIX00000000000001 /* Exceptions for "osh-iosTests" folder in "osh-iosTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Fixtures/README.md,
@@ -97,6 +101,28 @@
 				Fixtures/kraken-settings/schema-binary.json,
 				Fixtures/kraken-settings/schema-json.json,
 				Fixtures/kraken-settings/system.json,
+				Fixtures/lrf-range/datastream.json,
+				Fixtures/lrf-range/obs-binary.bin,
+				Fixtures/lrf-range/obs-binary.index.json,
+				Fixtures/lrf-range/obs-json.json,
+				Fixtures/lrf-range/obs-omjson.json,
+				Fixtures/lrf-range/schema-binary.json,
+				Fixtures/lrf-range/schema-json.json,
+				Fixtures/lrf-range/source-subsystems.json,
+				Fixtures/lrf-range/source-system.json,
+				Fixtures/lrf-range/subsystems.json,
+				Fixtures/lrf-range/system.json,
+				Fixtures/lrf-target/datastream.json,
+				Fixtures/lrf-target/obs-binary.bin,
+				Fixtures/lrf-target/obs-binary.index.json,
+				Fixtures/lrf-target/obs-json.json,
+				Fixtures/lrf-target/obs-omjson.json,
+				Fixtures/lrf-target/schema-binary.json,
+				Fixtures/lrf-target/schema-json.json,
+				Fixtures/lrf-target/source-subsystems.json,
+				Fixtures/lrf-target/source-system.json,
+				Fixtures/lrf-target/subsystems.json,
+				Fixtures/lrf-target/system.json,
 				Fixtures/spectrum-array/datastream.json,
 				Fixtures/spectrum-array/obs-binary.bin,
 				Fixtures/spectrum-array/obs-binary.index.json,
@@ -148,7 +174,7 @@
 		3A38D79A2F74157D00D8BF3F /* osh-iosTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				3A0OSHFIX00000000000001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				3A0OSHFIX00000000000001 /* Exceptions for "osh-iosTests" folder in "osh-iosTests" target */,
 			);
 			path = "osh-iosTests";
 			sourceTree = "<group>";
@@ -192,9 +218,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3A244AA13041C93100D98A1E /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				3A0OSHFIXREF000000000001 /* Fixtures */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		3A38D7812F74157B00D8BF3F = {
 			isa = PBXGroup;
 			children = (
+				3A0OSHPRIV0000000000001 /* PrivacyInfo.xcprivacy */,
+				3A0OSHVER00000000000003 /* stamp-build-version.sh */,
 				3A38D78C2F74157B00D8BF3F /* osh-ios */,
 				3A0OSH0001000000000000001 /* OSHiOS */,
 				3A0OSH0002000000000000001 /* OSHiOSShared */,
@@ -202,6 +238,7 @@
 				3A38D79A2F74157D00D8BF3F /* osh-iosTests */,
 				3A38D7A42F74157D00D8BF3F /* osh-iosUITests */,
 				3A38D78B2F74157B00D8BF3F /* Products */,
+				3A244AA13041C93100D98A1E /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -226,6 +263,7 @@
 				3A0OSHW01000000000000001 /* Sources */,
 				3A0OSHW00600000000000001 /* Frameworks */,
 				3A0OSHW01100000000000001 /* Resources */,
+				3A0OSHVER00000000000002 /* Stamp build version from git */,
 			);
 			buildRules = (
 			);
@@ -250,6 +288,7 @@
 				3A38D7872F74157B00D8BF3F /* Frameworks */,
 				3A38D7882F74157B00D8BF3F /* Resources */,
 				3A0OSHW00700000000000001 /* Embed Foundation Extensions */,
+				3A0OSHVER00000000000001 /* Stamp build version from git */,
 			);
 			buildRules = (
 			);
@@ -362,11 +401,55 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		3A0OSHVER00000000000001 /* Stamp build version from git */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/stamp-build-version.sh",
+			);
+			name = "Stamp build version from git";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/scripts/stamp-build-version.sh\"\n";
+		};
+		3A0OSHVER00000000000002 /* Stamp build version from git */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/stamp-build-version.sh",
+			);
+			name = "Stamp build version from git";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/scripts/stamp-build-version.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXResourcesBuildPhase section */
 		3A0OSHW01100000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A0OSHPRIV0000000000003 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -374,6 +457,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A0OSHPRIV0000000000002 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -450,6 +534,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8B548M8H4W;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXCLUDED_SOURCE_FILE_NAMES = "*.md";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "OSHiOSWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "OSH Session";
@@ -460,8 +546,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.opensensorhub.osh-ios.OSHiOSWidgets";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.OSHiOSWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -476,6 +562,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8B548M8H4W;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXCLUDED_SOURCE_FILE_NAMES = "*.md";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "OSHiOSWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "OSH Session";
@@ -486,8 +574,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.opensensorhub.osh-ios.OSHiOSWidgets";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.OSHiOSWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -625,13 +713,15 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8B548M8H4W;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXCLUDED_SOURCE_FILE_NAMES = "*.md";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "osh-ios-Info.plist";
-				INFOPLIST_KEY_NSCameraUsageDescription = "OSH needs camera access to stream video to a Connected Systems server.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "OSH needs location access to stream GPS data to a Connected Systems server.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Used to capture ambient sound level data for streaming to a Connected Systems server.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "OSH needs motion access to stream orientation data to a Connected Systems server.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "OSH captures video from the camera and streams it to your OpenSensorHub server. Video is sent only to the server you configure.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "OSH streams your position to your OpenSensorHub server as a sensor feed. Recording keeps going while the screen is locked, so a field session is not cut short and its data is not lost.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "OSH measures the ambient sound level and streams it to your OpenSensorHub server. Only a loudness figure is sent; no audio is recorded or saved.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "OSH reads device orientation and barometric altitude from the motion sensors and streams them to your OpenSensorHub server.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -642,8 +732,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.opensensorhub.osh-ios";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -659,13 +749,15 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8B548M8H4W;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXCLUDED_SOURCE_FILE_NAMES = "*.md";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "osh-ios-Info.plist";
-				INFOPLIST_KEY_NSCameraUsageDescription = "OSH needs camera access to stream video to a Connected Systems server.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "OSH needs location access to stream GPS data to a Connected Systems server.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Used to capture ambient sound level data for streaming to a Connected Systems server.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "OSH needs motion access to stream orientation data to a Connected Systems server.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "OSH captures video from the camera and streams it to your OpenSensorHub server. Video is sent only to the server you configure.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "OSH streams your position to your OpenSensorHub server as a sensor feed. Recording keeps going while the screen is locked, so a field session is not cut short and its data is not lost.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "OSH measures the ambient sound level and streams it to your OpenSensorHub server. Only a loudness figure is sent; no audio is recorded or saved.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "OSH reads device orientation and barometric altitude from the motion sensors and streams them to your OpenSensorHub server.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -676,8 +768,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.opensensorhub.osh-ios";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -693,8 +785,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.opensensorhub.osh-iosTests";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -711,8 +803,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.opensensorhub.osh-iosTests";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -727,8 +819,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.opensensorhub.osh-iosUITests";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -743,8 +835,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "org.opensensorhub.osh-iosUITests";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;

@@ -1,0 +1,58 @@
+{
+  "id": "03d9tsleg9eg",
+  "name": "Laser Range Finder LRF - targetLoc",
+  "system@id": "02nqpau0r420",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/02nqpau0r420?f=json",
+    "uid": "urn:lasertech:trupulse360:7ae57419dd427e4c:replay",
+    "type": "application/geo+json"
+  },
+  "outputName": "targetLoc",
+  "validTime": [
+    "2026-08-27T01:38:32.252Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-08-31T15:30:59.01Z",
+    "2026-08-31T15:30:59.01Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/FeatureOfInterestLocation",
+      "label": "Target Location"
+    }
+  ],
+  "resultType": "vector",
+  "formats": [
+    "application/om+json",
+    "application/swe+json",
+    "application/swe+csv",
+    "application/swe+xml",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/03d9tsleg9eg",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/03d9tsleg9eg?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/02nqpau0r420?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/03d9tsleg9eg/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

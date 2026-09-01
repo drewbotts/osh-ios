@@ -16,14 +16,25 @@ import SwiftUI
 struct SystemDashboardView: View {
 
     let system: RemoteSystem
+    let connection: NodeConnection
+    /// The other systems on this node, as the host already had them.
+    ///
+    /// Only a `.target` card reads them, and only to name the system a target
+    /// was observed from — a range finder's record says where the target is and
+    /// nothing about who was holding it. Empty is fine; the card then falls
+    /// back to this system.
+    let peers: [RemoteSystem]
 
     @EnvironmentObject private var connections: NodeConnectionStore
+    @EnvironmentObject private var router: TabRouter
     @StateObject private var session: SystemLiveSession
 
     @State private var expandedMapDatastream: RemoteDatastream?
 
-    init(system: RemoteSystem, connection: NodeConnection) {
+    init(system: RemoteSystem, connection: NodeConnection, peers: [RemoteSystem] = []) {
         self.system = system
+        self.connection = connection
+        self.peers = peers
         _session = StateObject(wrappedValue: SystemLiveSession(system: system,
                                                                connection: connection))
     }
@@ -33,10 +44,19 @@ struct SystemDashboardView: View {
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 12)], spacing: 12) {
+                // Controls first. A camera you can move is a camera you came
+                // to this screen to move, and burying the D-pad under nine
+                // observation cards would make the one interactive thing on
+                // the dashboard the hardest to find.
+                ForEach(system.controlStreams) { controlStream in
+                    ControlStreamCard(controlStream: controlStream,
+                                      connection: connection)
+                }
                 ForEach(orderedDatastreams) { datastream in
                     DatastreamCard(datastream: datastream,
                                    session: session,
-                                   onExpandMap: { expandedMapDatastream = $0 })
+                                   onExpandMap: { expandedMapDatastream = $0 },
+                                   targetContext: targetContext)
                 }
             }
             .padding(12)
@@ -61,6 +81,12 @@ struct SystemDashboardView: View {
     /// heading, and the LOB dial is meaningless without them.
     private var orderedDatastreams: [RemoteDatastream] {
         DashboardOrder.order(system.datastreams)
+    }
+
+    private var targetContext: TargetCardContext {
+        TargetCardContext(systems: peers) { source in
+            router.showOnMap(markerId: source.systemId)
+        }
     }
 
     // MARK: Toolbar
@@ -89,8 +115,9 @@ struct SystemDashboardView: View {
                 Text("\(system.subsystems.count) subsystems")
             }
             if system.controlStreamCount > 0 {
-                // Listed, never sent: commanding is Pass 4.
-                Label("\(system.controlStreamCount) control streams (read-only)",
+                Label(system.ptzCapability != nil
+                        ? "\(system.controlStreamCount) control streams, one of them PTZ"
+                        : "\(system.controlStreamCount) control streams",
                       systemImage: "slider.horizontal.3")
             }
             if let kind = system.positionKind {

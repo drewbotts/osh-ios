@@ -35,6 +35,11 @@ final class ObservationStream: Sendable {
     private let url: URL
     /// nil for an anonymous node — see BasicAuth.
     private let authHeader: String?
+    /// The certificate-trust policy, carried as plain values rather than as a
+    /// delegate instance: this type is Sendable, and a fresh delegate is made
+    /// for each connection attempt anyway since each gets its own session.
+    private let host: String?
+    private let allowSelfSignedCertificates: Bool
     private let decoder: DatastreamDecoder
     private let format: String
     private let state: StreamState
@@ -64,6 +69,8 @@ final class ObservationStream: Sendable {
         let server = connection.server
         self.authHeader = BasicAuth.header(username: server.username,
                                            password: server.password)
+        self.host = server.host
+        self.allowSelfSignedCertificates = server.allowSelfSignedCertificates
         self.url = Self.streamURL(base: server.url,
                                   datastreamId: datastreamId,
                                   format: self.format,
@@ -138,7 +145,14 @@ final class ObservationStream: Sendable {
         var backoff: UInt64 = 1
 
         while await state.isRunning {
-            let session = URLSession(configuration: .default)
+            // Same delegate as the REST clients. Without it a node the user
+            // has chosen to trust would serve every listing and refuse every
+            // stream — the flag has to reach the socket too.
+            let session = URLSession(
+                configuration: .default,
+                delegate: NodeSessionDelegate(host: host,
+                                              allowSelfSignedCertificates: allowSelfSignedCertificates),
+                delegateQueue: nil)
             var request = URLRequest(url: url)
             if let authHeader {
                 request.setValue(authHeader, forHTTPHeaderField: "Authorization")

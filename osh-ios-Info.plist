@@ -25,5 +25,38 @@
 	     HTTPS/TLS through the OS, which is exempt. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+
+	<!-- OSH nodes are frequently HTTP-only, and on private networks that no
+	     public CA will ever issue a certificate for. This app is a field tool
+	     whose server is typed in by the user: it has no fixed endpoint to
+	     declare an exception for, and refusing plain HTTP would make it
+	     useless against the majority of real deployments.
+
+	     Deliberately not NSExceptionDomains: an exception list would have to
+	     be keyed to particular hosts, which is exactly what a user-configured
+	     server is not. Transport security for a node the user chooses is
+	     handled where the user can see it — an https:// URL, plus the
+	     per-server "Trust server certificate (self-signed)" toggle, which
+	     accepts an untrusted certificate only for that server's own host.
+
+	     NSAllowsArbitraryLoads stands ALONE here, and must stay that way.
+	     Adding NSAllowsLocalNetworking (or either NSAllowsArbitraryLoadsIn…
+	     key) causes iOS 10+ to *ignore* NSAllowsArbitraryLoads entirely — the
+	     granular key wins and everything outside its scope goes back to being
+	     blocked. Both keys were set here at first, and the result was -1022 on
+	     a node at 100.82.29.90 while the same request from curl returned 200:
+	     a LAN node worked and every other address did not.
+
+	     Local networking is not lost by dropping that key. Arbitrary loads
+	     disables ATS for all destinations, local ones included; the narrow key
+	     exists only for apps that want the LAN exemption *without* disabling
+	     ATS globally, which is the opposite of what a user-configured server
+	     needs. NSLocalNetworkUsageDescription above is a separate mechanism —
+	     the iOS 14+ local-network privacy prompt — and is unaffected. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

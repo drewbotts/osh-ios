@@ -5,6 +5,122 @@ than by release, because the app has not shipped a versioned build yet.
 
 ---
 
+## Pass 3e — reaching a remote node (0.9.1)
+
+A node on a remote address could not be connected to at all while a node on the
+same LAN worked. Two separate causes, stacked:
+
+**App Transport Security was never configured.** With no `NSAppTransportSecurity`
+key, only private address ranges reached a plain-HTTP node. `100.64.0.0/10` —
+what Tailscale and other CGNAT setups hand out — is not a private range as far
+as ATS is concerned, so `http://100.x.y.z:8080` was refused before a packet left
+the device while `http://192.168.x.x:8080` was allowed. The README had claimed
+ATS "allows arbitrary loads for local addresses", which was not true of a build
+that set nothing.
+
+**The HTTPS alternative could not be trusted.** The same node offered TLS on
+another port, but with a self-signed certificate (`CN=ogc-demo`, issuer equal to
+subject, and a SAN naming only `DNS:ogc-demo` — no IP). iOS rejected it with
+`-1202`, and the app had no way to say otherwise. Both routes to the node were
+therefore closed, and the app reported only "Connection failed".
+
+### Added
+
+**`NSAppTransportSecurity` on the app target**, `NSAllowsArbitraryLoads` and
+nothing else, in `osh-ios-Info.plist` — the widget's plist is untouched.
+Deliberately not an `NSExceptionDomains` list: a per-host exception is exactly
+what a server the user types in cannot be.
+
+That key has to stand alone. `NSAllowsLocalNetworking` was set beside it at
+first, on the assumption that the two are evaluated independently; they are not
+— iOS 10+ **ignores `NSAllowsArbitraryLoads` whenever a granular key is
+present**, so the app still refused plain HTTP to `100.82.29.90` with `-1022`
+while curl to the same URL returned `200`. Removing the narrow key loses
+nothing: arbitrary loads disables ATS for local destinations too, and
+`NSLocalNetworkUsageDescription` — the iOS 14+ privacy prompt — is a separate
+mechanism and unaffected.
+
+**`ServerConfig.allowSelfSignedCertificates`**, per server and off by default,
+with a **"Trust server certificate (self-signed)"** toggle in `ServerDetailView`
+and a footer saying what it does. Persisted through `KeychainServerStore`, whose
+stored `Metadata` takes the flag as an *optional* Bool: a record written before
+the field existed has no such key, and a non-optional would have failed the
+whole decode — losing every configured server rather than one setting.
+
+**`ConnectionErrorMessage`**, one mapping from a transport failure to words that
+name the fix. `-1022` names HTTP, the certificate family (`-1200`, `-1202`,
+`-1203`, `-1201`, `-1204`) points at the trust toggle, and timeout, unreachable
+and offline each get their own line. Anything unmapped defers to the system
+description rather than inventing one. `SensorSession.userFacingMessage(for:)`
+and `testConnectivity()` both read from it, so the Systems tab status row, the
+session banner and the log stop phrasing one failure three ways.
+
+### Changed
+
+**`NoRedirectDelegate` is now `NodeSessionDelegate`**, carrying certificate
+trust as well as redirect suppression — the old name would have described half
+of what it does. A self-signed certificate is accepted only when the flag is on
+*and* the challenge host equals the configured server's host; every other path,
+including a non-certificate challenge, falls through to default handling. It is
+now shared by all four callers: both REST clients, the command client and — new
+— the observations WebSocket, which built a bare `URLSession(configuration:)`
+with no delegate and would have refused to stream from a node the user had just
+trusted for everything else.
+
+**A redirect is no longer reported as a successful connection.**
+`testConnectivity()` treated any non-401 status as `.connected`, so a 3xx read
+as "Connected" while every subsequent listing failed. It now returns
+`.unreachable("Server redirected to <Location> — update the server URL")`,
+naming the header that makes it actionable.
+
+**`NodeConnectionStore` rebuilds on a trust change.** Its `differs` check
+compares the fields the clients are constructed from, and
+`allowSelfSignedCertificates` was missing from it — so turning the toggle on
+for a server that was already selected kept the existing connection, whose
+delegates had been built for the old value, and the setting appeared to do
+nothing at all. Every field the clients read is now in that comparison, with a
+test per field.
+
+**Every deployment target is 26.0.** The app target had been raised while
+`osh-iosTests`, `osh-iosUITests` and `OSHiOSWidgets` stayed at 18.5, so the test
+target could not compile against the app module — the suite did not build at
+all.
+
+### Fixed
+
+Five pre-existing strict-concurrency warnings, all of which a clean build
+surfaced and an incremental one had been hiding. Three shared
+`ISO8601DateFormatter` statics gained the `nonisolated(unsafe)` that
+`ObservationStream`'s equivalent already carried. The two Live Activity handles
+move through an `ActivityHandle` box: `Activity`'s `update` and `end` are
+nonisolated `async`, so awaiting either from a `@MainActor` type sends a
+non-Sendable value off the actor whatever the enclosing task is isolated to.
+
+### Tests
+
+`NodeSessionDelegateTests` covers the delegate's decisions — flag off, flag on
+against a different host, flag on with no configured host, a host that only
+shares a suffix, a Basic-auth challenge under both flag settings, and redirect
+suppression. `ConnectionErrorMessageTests` covers the mapping and asserts the
+session banner agrees with it. `ServerConfigTrustPersistenceTests` decodes both
+a legacy record and a current one, and checks host derivation from a URL with a
+scheme, port and path.
+
+`NodeConnectionStoreTests` asserts a rebuild for each of url, username,
+password and trust, and no rebuild when nothing changed — identity being the
+observable difference, since the clients capture their policy at init.
+
+`LiveNodeTests` gained a connectivity test and reads
+`OSH_TRUST_SELF_SIGNED`, so the live suite can be pointed at a self-signed
+`https://` node. Verified against a real node over both a LAN address and a
+tailnet one: HTTP 6/6, HTTPS with the flag on 6/6 including the WebSocket
+subscribe, and HTTPS with the flag off failing 6/6 with `-1202` and
+"Certificate not trusted" — the negative control that shows the default is
+unchanged. The tailnet HTTP run is the one that would have caught the ATS key
+conflict, and did.
+
+---
+
 ## Pass 3d — TestFlight distribution
 
 No behaviour change: build configuration, distribution metadata and one release

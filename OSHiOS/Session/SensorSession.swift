@@ -583,20 +583,11 @@ final class SensorSession: ObservableObject {
             }
         }
 
-        if let urlErr = error as? URLError {
-            switch urlErr.code {
-            case .notConnectedToInternet, .networkConnectionLost:
-                return ("No internet connection",
-                        "Check your network connection and try again")
-            case .timedOut:
-                return ("Connection timed out",
-                        "The server took too long to respond — check the URL and try again")
-            case .cannotConnectToHost, .cannotFindHost:
-                return ("Cannot reach server",
-                        "Check the server URL and make sure the OSH node is running")
-            default:
-                break
-            }
+        // Shared with the connectivity test so the Systems tab status row, this
+        // banner and the log all say the same thing about the same failure.
+        if let urlErr = error as? URLError,
+           let mapped = ConnectionErrorMessage.userFacing(for: urlErr) {
+            return mapped
         }
 
         return ("Connection failed",

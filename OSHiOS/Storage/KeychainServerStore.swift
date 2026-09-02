@@ -11,19 +11,31 @@ struct ServerConfig: Codable, Identifiable {
     var username: String
     var password: String
 
+    /// Accept this server's certificate even though it does not chain to a
+    /// trusted root. Per server and off by default: an OSH node on a private
+    /// network is commonly issued a self-signed certificate, and the user is
+    /// the only one who can say that a given box is theirs.
+    var allowSelfSignedCertificates: Bool
+
     init(id: UUID = UUID(),
          label: String,
          description: String = "",
          url: String,
          username: String,
-         password: String) {
+         password: String,
+         allowSelfSignedCertificates: Bool = false) {
         self.id          = id
         self.label       = label
         self.description = description
         self.url         = url
         self.username    = username
         self.password    = password
+        self.allowSelfSignedCertificates = allowSelfSignedCertificates
     }
+
+    /// Host of `url`, for matching a certificate challenge against the server
+    /// the user actually configured.
+    var host: String? { URLComponents(string: url)?.host }
 }
 
 // MARK: - KeychainServerStore
@@ -44,6 +56,10 @@ final class KeychainServerStore {
         var description: String
         var url: String
         var username: String
+        /// Optional, not defaulted: a record written before this flag existed
+        /// has no such key, and a non-optional Bool would fail the whole
+        /// decode — losing every configured server rather than one setting.
+        var allowSelfSignedCertificates: Bool?
     }
 
     // MARK: - Public API
@@ -53,7 +69,8 @@ final class KeychainServerStore {
         var records = loadMetadata()
         let meta = Metadata(id: config.id, label: config.label,
                             description: config.description,
-                            url: config.url, username: config.username)
+                            url: config.url, username: config.username,
+                            allowSelfSignedCertificates: config.allowSelfSignedCertificates)
         if let idx = records.firstIndex(where: { $0.id == config.id }) {
             records[idx] = meta
         } else {
@@ -76,7 +93,8 @@ final class KeychainServerStore {
                          description: meta.description,
                          url: meta.url,
                          username: meta.username,
-                         password: loadPassword(for: meta.id))
+                         password: loadPassword(for: meta.id),
+                         allowSelfSignedCertificates: meta.allowSelfSignedCertificates ?? false)
         }
     }
 

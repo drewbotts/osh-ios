@@ -32,7 +32,10 @@ actor CommandClient {
 
     /// Same signature and auth/redirect handling as the other two clients, so a
     /// NodeConnection can build all three from one ServerConfig.
-    init(nodeURL: String, username: String, password: String) throws {
+    init(nodeURL: String,
+         username: String,
+         password: String,
+         allowSelfSignedCertificates: Bool = false) throws {
         guard let url = URL(string: nodeURL.hasSuffix("/") ? nodeURL : nodeURL + "/") else {
             throw ClientError.invalidURL(nodeURL)
         }
@@ -45,9 +48,11 @@ actor CommandClient {
         // it again, and a queue of stale moves is worse than a failure.
         config.timeoutIntervalForRequest  = 10
         config.timeoutIntervalForResource = 20
-        self.session = URLSession(configuration: config,
-                                  delegate: NoRedirectDelegate(),
-                                  delegateQueue: nil)
+        self.session = URLSession(
+            configuration: config,
+            delegate: NodeSessionDelegate(host: url.host,
+                                          allowSelfSignedCertificates: allowSelfSignedCertificates),
+            delegateQueue: nil)
     }
 
     // MARK: Receipt

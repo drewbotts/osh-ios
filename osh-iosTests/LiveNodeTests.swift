@@ -19,6 +19,20 @@ struct LiveNodeTests {
 
     // MARK: Read client
 
+    @Test("Reports the node as connected")
+    func reportsConnected() async throws {
+        let server = try LiveNode.server()
+        let client = try ConnectedSystemsClient(
+            nodeURL: server.url,
+            username: server.username,
+            password: server.password,
+            allowSelfSignedCertificates: server.allowSelfSignedCertificates)
+        let result = await client.testConnectivity()
+        // Named in the message because a redirect and an untrusted certificate
+        // both land here, and which one it was is the whole diagnosis.
+        #expect(result == .connected, "testConnectivity returned \(result)")
+    }
+
     @Test("Lists systems and datastreams")
     func listsSystems() async throws {
         let client = try LiveNode.readClient()
@@ -148,20 +162,30 @@ enum LiveNode {
 
     static var isConfigured: Bool { url != nil }
 
+    /// Set OSH_TRUST_SELF_SIGNED=1 to point the live suite at an https:// node
+    /// whose certificate does not chain to a trusted root — the common shape
+    /// for an OSH box on a private network.
+    static var trustsSelfSignedCertificates: Bool {
+        let value = ProcessInfo.processInfo.environment["OSH_TRUST_SELF_SIGNED"] ?? ""
+        return value == "1" || value.lowercased() == "true" || value.lowercased() == "yes"
+    }
+
     static func server() throws -> ServerConfig {
         let environment = ProcessInfo.processInfo.environment
         guard let url else { throw LiveNodeError.notConfigured }
         return ServerConfig(label: "live",
                             url: url,
                             username: environment["OSH_TEST_USER"] ?? "",
-                            password: environment["OSH_TEST_PASS"] ?? "")
+                            password: environment["OSH_TEST_PASS"] ?? "",
+                            allowSelfSignedCertificates: trustsSelfSignedCertificates)
     }
 
     static func readClient() throws -> ConnectedSystemsReadClient {
         let config = try server()
         return try ConnectedSystemsReadClient(nodeURL: config.url,
                                               username: config.username,
-                                              password: config.password)
+                                              password: config.password,
+                                              allowSelfSignedCertificates: config.allowSelfSignedCertificates)
     }
 
     /// The first datastream that is not a binary-block stream — one whose

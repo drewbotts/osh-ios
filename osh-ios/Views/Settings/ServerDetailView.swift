@@ -19,6 +19,7 @@ struct ServerDetailView: View {
     @State private var url: String
     @State private var username: String
     @State private var password: String
+    @State private var allowSelfSigned: Bool
 
     // MARK: - Validation errors
 
@@ -42,6 +43,8 @@ struct ServerDetailView: View {
         _url         = State(initialValue: existingConfig?.url         ?? "")
         _username    = State(initialValue: existingConfig?.username    ?? "")
         _password    = State(initialValue: existingConfig?.password    ?? "")
+        _allowSelfSigned = State(
+            initialValue: existingConfig?.allowSelfSignedCertificates ?? false)
     }
 
     // MARK: - Body
@@ -98,13 +101,22 @@ struct ServerDetailView: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
             SecureField("Password (optional)", text: $password)
+
+            // Shown for every server rather than only https:// ones: the URL
+            // field is still being typed while this section is on screen, and
+            // a toggle that appeared and vanished mid-edit would be worse than
+            // one that is simply irrelevant to an http:// node.
+            Toggle("Trust server certificate (self-signed)", isOn: $allowSelfSigned)
         } header: {
             Text("Connection")
         } footer: {
-            // Not every node wants credentials, and sending empty ones is worse
-            // than sending none: a node with anonymous read enabled answers 401
-            // to an empty Basic user it would have served without a header.
-            Text("Leave the username blank for a node that allows anonymous access.")
+            VStack(alignment: .leading, spacing: 6) {
+                // Not every node wants credentials, and sending empty ones is worse
+                // than sending none: a node with anonymous read enabled answers 401
+                // to an empty Basic user it would have served without a header.
+                Text("Leave the username blank for a node that allows anonymous access.")
+                Text("Turn on certificate trust only for an https:// node you run yourself — it accepts a certificate that does not chain to a trusted root, for this server's host only.")
+            }
         }
     }
 
@@ -133,9 +145,16 @@ struct ServerDetailView: View {
                 Label("Authentication failed", systemImage: "xmark.circle.fill")
                     .foregroundStyle(.red)
             case .unreachable(let msg):
-                Label("Could not reach server", systemImage: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                    .help(msg)
+                // The message is the point — it names ATS, an untrusted
+                // certificate or a redirect and what to do about it, none of
+                // which fits in a .help() tooltip on a touch device.
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Could not reach server", systemImage: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             case .none, .testing:
                 EmptyView()
             }
@@ -150,7 +169,8 @@ struct ServerDetailView: View {
             let client = try ConnectedSystemsClient(
                 nodeURL: url,
                 username: username,
-                password: password
+                password: password,
+                allowSelfSignedCertificates: allowSelfSigned
             )
             let result = await client.testConnectivity()
             switch result {
@@ -176,7 +196,8 @@ struct ServerDetailView: View {
             description: description.trimmingCharacters(in: .whitespaces),
             url:         url.trimmingCharacters(in: .whitespaces),
             username:    username.trimmingCharacters(in: .whitespaces),
-            password:    password
+            password:    password,
+            allowSelfSignedCertificates: allowSelfSigned
         )
         settings.saveServer(config)
         dismiss()

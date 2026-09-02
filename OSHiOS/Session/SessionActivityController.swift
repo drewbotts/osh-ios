@@ -78,8 +78,9 @@ final class SessionActivityController {
         guard let activity else { return }
         self.activity = nil
         lastPushedAt = nil
+        let handle = ActivityHandle(activity: activity)
         Task {
-            await activity.end(nil, dismissalPolicy: .immediate)
+            await handle.activity.end(nil, dismissalPolicy: .immediate)
         }
     }
 
@@ -93,8 +94,27 @@ final class SessionActivityController {
             startedAt: startedAt,
             isConnected: isConnected)
         lastPushedAt = Date()
+        let handle = ActivityHandle(activity: activity)
         Task {
-            await activity.update(.init(state: state, staleDate: nil))
+            await handle.activity.update(.init(state: state, staleDate: nil))
         }
     }
+}
+
+// MARK: - ActivityHandle
+//
+// ActivityKit's Activity is not marked Sendable, and its update/end are
+// nonisolated async — so awaiting either one from this @MainActor type sends a
+// non-Sendable value to a nonisolated executor, whatever the enclosing task is
+// isolated to.
+//
+// It is safe here for a reason specific to what an Activity is: a handle to an
+// activity the system owns in another process. update and end forward to that
+// system service and touch no state this class shares — and each is reached
+// through a handle created for exactly one call, so two of them never race
+// over the same box. The unchecked conformance is the narrowest way to say
+// that; the alternative is to leave a warning that would be an error under the
+// Swift 6 language mode.
+private struct ActivityHandle: @unchecked Sendable {
+    let activity: Activity<SessionActivityAttributes>
 }

@@ -35,7 +35,7 @@ actor ConnectedSystemsClient {
     // and Foundation documents string(from:) as thread-safe for concurrent
     // formatting. Keeping it static (rather than an actor-isolated instance
     // property) is what lets the JSON builders below stay `nonisolated`.
-    private static let isoFormatter: ISO8601DateFormatter = {
+    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
@@ -43,7 +43,10 @@ actor ConnectedSystemsClient {
 
     // MARK: Init
 
-    init(nodeURL: String, username: String, password: String) throws {
+    init(nodeURL: String,
+         username: String,
+         password: String,
+         allowSelfSignedCertificates: Bool = false) throws {
         guard let url = URL(string: nodeURL.hasSuffix("/") ? nodeURL : nodeURL + "/") else {
             throw ClientError.invalidURL(nodeURL)
         }
@@ -54,12 +57,13 @@ actor ConnectedSystemsClient {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest  = 30
         config.timeoutIntervalForResource = 60
-        // NoRedirectDelegate prevents URLSession from following HTTP redirects.
-        // The OSH server redirects 404 errors to its admin error page, which in turn
-        // redirects to /sensorhub and returns 401 — masking the real status code.
-        self.session = URLSession(configuration: config,
-                                  delegate: NoRedirectDelegate(),
-                                  delegateQueue: nil)
+        // NodeSessionDelegate suppresses redirects and applies the user's
+        // certificate-trust choice — see that type for why both live together.
+        self.session = URLSession(
+            configuration: config,
+            delegate: NodeSessionDelegate(host: url.host,
+                                          allowSelfSignedCertificates: allowSelfSignedCertificates),
+            delegateQueue: nil)
     }
 
     // MARK: - System registration
@@ -471,9 +475,9 @@ actor ConnectedSystemsClient {
     /// Tests server reachability and credentials by issuing GET /systems.
     ///
     /// - Returns:
-    ///   - `.connected`           — server responded (2xx, 404, or any non-401 HTTP status)
+    ///   - `.connected`            — server responded (2xx, 404, or another non-401, non-3xx status)
     ///   - `.authenticationFailed` — server returned 401
-    ///   - `.unreachable`          — network error or non-HTTP response
+    ///   - `.unreachable`          — network error, redirect, or non-HTTP response
     func testConnectivity() async -> ConnectivityResult {
         let url = baseURL.appendingPathComponent("systems")
         var request = URLRequest(url: url)
@@ -485,9 +489,21 @@ actor ConnectedSystemsClient {
                 return .unreachable("Non-HTTP response")
             }
             if http.statusCode == 401 { return .authenticationFailed }
+
+            // A redirect used to count as success, because anything that was
+            // not a 401 did. That reported a node the app cannot actually read
+            // as "Connected" and left the real failure to show up later, one
+            // listing at a time. NodeSessionDelegate does not follow
+            // redirects by design, so the hop has to be reported here instead
+            // — and the Location header is the one thing that makes it
+            // actionable, since the fix is always to correct the server URL.
+            if (300...399).contains(http.statusCode) {
+                let location = http.value(forHTTPHeaderField: "Location") ?? "an unspecified address"
+                return .unreachable("Server redirected to \(location) — update the server URL")
+            }
             return .connected
         } catch {
-            return .unreachable(error.localizedDescription)
+            return .unreachable(ConnectionErrorMessage.summary(for: error))
         }
     }
 
@@ -545,7 +561,7 @@ actor ConnectedSystemsClient {
             throw ClientError.invalidResponse
         }
         guard (200...299).contains(http.statusCode) else {
-            // The status code alone is not enough to act on. NoRedirectDelegate
+            // The status code alone is not enough to act on. NodeSessionDelegate
             // stops URLSession following redirects, and the node answers a 404
             // with a 302 to its admin error page — so a bare "HTTP 302" hides
             // whether the resource was missing, the body was rejected, or the

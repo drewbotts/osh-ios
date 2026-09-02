@@ -17,7 +17,7 @@ must exist, and the app record must exist in App Store Connect.
 
 | Field | Where it comes from | Value today |
 |---|---|---|
-| Version (`CFBundleShortVersionString`) | `MARKETING_VERSION`, set per target | `0.9.0` |
+| Version (`CFBundleShortVersionString`) | `MARKETING_VERSION`, set per target | `0.9.1` |
 | Build (`CFBundleVersion`) | `scripts/stamp-build-version.sh`, from `git rev-list --count HEAD` | the commit count |
 
 **The build number is never edited by hand.** A last build phase on both the app
@@ -151,10 +151,17 @@ Paste into App Store Connect → TestFlight → the build → **What to Test**.
 > 2. Label it, and enter the base API URL, including the path:
 >    `http://192.168.1.50:8181/sensorhub/api`
 > 3. Username and password are optional — leave both blank for an open node.
-> 4. **Test Connection**. A green check means the node answered and accepted the
+> 4. **Trust server certificate (self-signed)** — leave this off unless the node
+>    is `https://` and its certificate is one you issued yourself, which is
+>    normal for an OSH box on a private network. With it off, such a node fails
+>    with "Certificate not trusted"; with it on, the certificate is accepted for
+>    that server's host only. Plain `http://` nodes do not need it.
+> 5. **Test Connection**. A green check means the node answered and accepted the
 >    credentials. Fix this before going further; a red result here explains
->    every empty screen that follows.
-> 5. Go to **Systems** and select the server in the picker at the top.
+>    every empty screen that follows — it now names the actual cause, whether
+>    that is an untrusted certificate, a redirect to a different URL, or a
+>    server that cannot be reached at all.
+> 6. Go to **Systems** and select the server in the picker at the top.
 >
 > **Live** — this device as a sensor. Toggle the sensors you want in Settings,
 > then **Start Streaming**. Each enabled sensor gets a card with its current

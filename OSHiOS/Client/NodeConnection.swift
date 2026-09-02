@@ -31,15 +31,19 @@ final class NodeConnection: ObservableObject {
 
     init(server: ServerConfig) throws {
         self.server = server
+        let trust = server.allowSelfSignedCertificates
         self.readClient  = try ConnectedSystemsReadClient(nodeURL: server.url,
                                                           username: server.username,
-                                                          password: server.password)
+                                                          password: server.password,
+                                                          allowSelfSignedCertificates: trust)
         self.writeClient = try ConnectedSystemsClient(nodeURL: server.url,
                                                       username: server.username,
-                                                      password: server.password)
+                                                      password: server.password,
+                                                      allowSelfSignedCertificates: trust)
         self.commandClient = try CommandClient(nodeURL: server.url,
                                                username: server.username,
-                                               password: server.password)
+                                               password: server.password,
+                                               allowSelfSignedCertificates: trust)
     }
 
     func checkConnectivity() async {

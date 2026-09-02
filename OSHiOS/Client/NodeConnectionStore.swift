@@ -43,10 +43,17 @@ final class NodeConnectionStore: ObservableObject {
     }
 
     /// True when anything the clients were built from has changed.
+    ///
+    /// Every field the three clients are constructed from has to appear here.
+    /// allowSelfSignedCertificates was missed when it was added, and the
+    /// symptom was precise: turning the trust toggle on for a server already
+    /// selected changed nothing, because this returned false and the old
+    /// connection — with its delegates built for the old value — was kept.
     private static func differs(_ lhs: ServerConfig, _ rhs: ServerConfig) -> Bool {
         lhs.id != rhs.id
             || lhs.url != rhs.url
             || lhs.username != rhs.username
             || lhs.password != rhs.password
+            || lhs.allowSelfSignedCertificates != rhs.allowSelfSignedCertificates
     }
 }

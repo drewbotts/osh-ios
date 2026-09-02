@@ -475,6 +475,21 @@ OSH_NODE=http://host:8080/sensorhub/api ./scripts/capture-fixtures.sh survey
 OSH_NODE=http://host:8080/sensorhub/api ./scripts/capture-fixtures.sh capture
 ```
 
+Point the live suite at an `https://` node with a self-signed certificate by
+adding `TEST_RUNNER_OSH_TRUST_SELF_SIGNED=1`, which is the same choice the
+per-server toggle makes in the UI:
+
+```bash
+TEST_RUNNER_OSH_NODE=https://host:8443/sensorhub/api \
+TEST_RUNNER_OSH_TRUST_SELF_SIGNED=1 \
+  xcodebuild -project osh-ios.xcodeproj -scheme osh-ios \
+    -destination 'platform=iOS Simulator,name=iPhone 17' \
+    -only-testing:osh-iosTests/LiveNodeTests test
+```
+
+Leaving it out against such a node is a useful check in itself: the suite should
+fail with `-1202` and "Certificate not trusted", which is what a user sees.
+
 `survey` prints the node's systems, datastreams and component types without
 writing anything; `capture` writes `osh-iosTests/Fixtures/` and is idempotent.
 `OSH_TEST_USER` / `OSH_TEST_PASS` are used as Basic credentials when both are
@@ -513,8 +528,47 @@ device motion, and only a simulated location.
    now holds, with live sent / bytes / error counts beside each one this session
    is feeding.
 
-Plain `http://` to a LAN node works because App Transport Security allows
-arbitrary loads for local addresses; a public node should use HTTPS.
+### Transport security
+
+The app target sets `NSAppTransportSecurity` with **`NSAllowsArbitraryLoads`**
+alone, in `osh-ios-Info.plist`. This is a deliberate choice, not an oversight:
+
+- OSH nodes are frequently HTTP-only, on private networks no public CA will
+  issue a certificate for.
+- The app is a field tool whose server is typed in by the user. There is no
+  fixed endpoint to declare an `NSExceptionDomains` entry for, which is why
+  there is no exception list — a per-host exception is exactly what a
+  user-configured server cannot be.
+
+**`NSAllowsArbitraryLoads` must stay the only key in that dictionary.** Adding
+`NSAllowsLocalNetworking`, or either `NSAllowsArbitraryLoadsIn…` key, makes
+iOS 10+ *ignore* `NSAllowsArbitraryLoads` — the granular key wins, and every
+destination outside its scope goes back to being blocked. Both keys were set
+here at first and the result was `-1022` against a node at `100.82.29.90` while
+curl to the same URL returned `200`: the LAN worked, nothing else did.
+
+Dropping the narrow key loses nothing. Arbitrary loads disables ATS for all
+destinations, local ones included; `NSAllowsLocalNetworking` exists for apps
+that want the LAN exemption *without* disabling ATS globally, which is the
+opposite of what a user-configured server needs.
+`NSLocalNetworkUsageDescription` is a separate mechanism — the iOS 14+
+local-network privacy prompt — and is unaffected.
+
+Without any of this, only *private* address ranges reach the node. An address in
+`100.64.0.0/10` — what Tailscale and other CGNAT setups hand out — is not a
+private range as far as ATS is concerned, so a tailnet node on plain HTTP was
+blocked before a packet left the device while a `192.168.x.x` node worked. That
+asymmetry is what the setting removes.
+
+For an `https://` node whose certificate does not chain to a trusted root,
+enable **Trust server certificate (self-signed)** on that server in Settings.
+It is per server, off by default, and accepts the certificate only when the
+challenge comes from that server's own host — see `NodeSessionDelegate`, which
+the two REST clients, the command client and the observations WebSocket all
+share so that a trusted node is reachable by every one of them or none.
+
+A node reachable from outside a trusted network should still use HTTPS with a
+certificate that validates normally.
 
 ---
 

@@ -28,7 +28,10 @@ actor ConnectedSystemsReadClient {
 
     /// Same signature and auth/redirect handling as ConnectedSystemsClient, so
     /// a NodeConnection can build both from one ServerConfig.
-    init(nodeURL: String, username: String, password: String) throws {
+    init(nodeURL: String,
+         username: String,
+         password: String,
+         allowSelfSignedCertificates: Bool = false) throws {
         guard let url = URL(string: nodeURL.hasSuffix("/") ? nodeURL : nodeURL + "/") else {
             throw ClientError.invalidURL(nodeURL)
         }
@@ -39,9 +42,11 @@ actor ConnectedSystemsReadClient {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest  = 30
         config.timeoutIntervalForResource = 60
-        self.session = URLSession(configuration: config,
-                                  delegate: NoRedirectDelegate(),
-                                  delegateQueue: nil)
+        self.session = URLSession(
+            configuration: config,
+            delegate: NodeSessionDelegate(host: url.host,
+                                          allowSelfSignedCertificates: allowSelfSignedCertificates),
+            delegateQueue: nil)
     }
 
     // MARK: Systems
@@ -253,7 +258,7 @@ actor ConnectedSystemsReadClient {
         isoFormatter.date(from: text) ?? isoPlainFormatter.date(from: text)
     }
 
-    private static let isoPlainFormatter: ISO8601DateFormatter = {
+    nonisolated(unsafe) private static let isoPlainFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
@@ -435,7 +440,7 @@ actor ConnectedSystemsReadClient {
     static let sweBinary = "application/swe+binary"
     static let omJSON = "application/om+json"
 
-    private static let isoFormatter: ISO8601DateFormatter = {
+    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter

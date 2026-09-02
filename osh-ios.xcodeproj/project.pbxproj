@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3A0OSHFIXBLD000000000001 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 3A0OSHFIXREF000000000001 /* Fixtures */; };
 		3A0OSHPRIV0000000000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3A0OSHPRIV0000000000001 /* PrivacyInfo.xcprivacy */; };
 		3A0OSHPRIV0000000000003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3A0OSHPRIV0000000000001 /* PrivacyInfo.xcprivacy */; };
-		3A0OSHFIXBLD000000000001 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 3A0OSHFIXREF000000000001 /* Fixtures */; };
 		3A0OSHW00100000000000001 /* OSHiOSWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3A0OSHW00200000000000001 /* OSHiOSWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -52,9 +52,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3A0OSHFIXREF000000000001 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = "osh-iosTests/Fixtures"; sourceTree = SOURCE_ROOT; };
 		3A0OSHPRIV0000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3A0OSHVER00000000000003 /* stamp-build-version.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; name = "stamp-build-version.sh"; path = "scripts/stamp-build-version.sh"; sourceTree = "<group>"; };
-		3A0OSHFIXREF000000000001 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = "osh-iosTests/Fixtures"; sourceTree = SOURCE_ROOT; };
 		3A0OSHW00200000000000001 /* OSHiOSWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OSHiOSWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A38D78A2F74157B00D8BF3F /* osh-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "osh-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A38D7972F74157D00D8BF3F /* osh-iosTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "osh-iosTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -65,85 +65,85 @@
 		3A0OSHFIX00000000000001 /* Exceptions for "osh-iosTests" folder in "osh-iosTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Fixtures/README.md,
-				Fixtures/ais-vessel-location/datastream.json,
-				Fixtures/ais-vessel-location/obs-binary.bin,
-				Fixtures/ais-vessel-location/obs-binary.index.json,
-				Fixtures/ais-vessel-location/obs-json.json,
-				Fixtures/ais-vessel-location/obs-omjson.json,
-				Fixtures/ais-vessel-location/schema-binary.json,
-				Fixtures/ais-vessel-location/schema-json.json,
-				Fixtures/ais-vessel-location/system.json,
-				Fixtures/choice-ptz-control/control-schema.json,
-				Fixtures/choice-ptz-control/controlstreams.json,
-				Fixtures/choice-ptz-control/system.json,
+				"Fixtures/ais-vessel-location/datastream.json",
+				"Fixtures/ais-vessel-location/obs-binary.bin",
+				"Fixtures/ais-vessel-location/obs-binary.index.json",
+				"Fixtures/ais-vessel-location/obs-json.json",
+				"Fixtures/ais-vessel-location/obs-omjson.json",
+				"Fixtures/ais-vessel-location/schema-binary.json",
+				"Fixtures/ais-vessel-location/schema-json.json",
+				"Fixtures/ais-vessel-location/system.json",
+				"Fixtures/choice-ptz-control/control-schema.json",
+				"Fixtures/choice-ptz-control/controlstreams.json",
+				"Fixtures/choice-ptz-control/system.json",
 				Fixtures/gps/datastream.json,
-				Fixtures/gps/obs-binary.bin,
-				Fixtures/gps/obs-binary.index.json,
-				Fixtures/gps/obs-json.json,
-				Fixtures/gps/obs-omjson.json,
-				Fixtures/gps/schema-binary.json,
-				Fixtures/gps/schema-json.json,
+				"Fixtures/gps/obs-binary.bin",
+				"Fixtures/gps/obs-binary.index.json",
+				"Fixtures/gps/obs-json.json",
+				"Fixtures/gps/obs-omjson.json",
+				"Fixtures/gps/schema-binary.json",
+				"Fixtures/gps/schema-json.json",
 				Fixtures/gps/system.json,
-				Fixtures/kraken-doa/datastream.json,
-				Fixtures/kraken-doa/obs-binary.bin,
-				Fixtures/kraken-doa/obs-binary.index.json,
-				Fixtures/kraken-doa/obs-json.json,
-				Fixtures/kraken-doa/obs-omjson.json,
-				Fixtures/kraken-doa/schema-binary.json,
-				Fixtures/kraken-doa/schema-json.json,
-				Fixtures/kraken-doa/system.json,
-				Fixtures/kraken-settings/datastream.json,
-				Fixtures/kraken-settings/obs-binary.bin,
-				Fixtures/kraken-settings/obs-binary.index.json,
-				Fixtures/kraken-settings/obs-json.json,
-				Fixtures/kraken-settings/obs-omjson.json,
-				Fixtures/kraken-settings/schema-binary.json,
-				Fixtures/kraken-settings/schema-json.json,
-				Fixtures/kraken-settings/system.json,
-				Fixtures/lrf-range/datastream.json,
-				Fixtures/lrf-range/obs-binary.bin,
-				Fixtures/lrf-range/obs-binary.index.json,
-				Fixtures/lrf-range/obs-json.json,
-				Fixtures/lrf-range/obs-omjson.json,
-				Fixtures/lrf-range/schema-binary.json,
-				Fixtures/lrf-range/schema-json.json,
-				Fixtures/lrf-range/source-subsystems.json,
-				Fixtures/lrf-range/source-system.json,
-				Fixtures/lrf-range/subsystems.json,
-				Fixtures/lrf-range/system.json,
-				Fixtures/lrf-target/datastream.json,
-				Fixtures/lrf-target/obs-binary.bin,
-				Fixtures/lrf-target/obs-binary.index.json,
-				Fixtures/lrf-target/obs-json.json,
-				Fixtures/lrf-target/obs-omjson.json,
-				Fixtures/lrf-target/schema-binary.json,
-				Fixtures/lrf-target/schema-json.json,
-				Fixtures/lrf-target/source-subsystems.json,
-				Fixtures/lrf-target/source-system.json,
-				Fixtures/lrf-target/subsystems.json,
-				Fixtures/lrf-target/system.json,
-				Fixtures/spectrum-array/datastream.json,
-				Fixtures/spectrum-array/obs-binary.bin,
-				Fixtures/spectrum-array/obs-binary.index.json,
-				Fixtures/spectrum-array/obs-json.json,
-				Fixtures/spectrum-array/obs-omjson.json,
-				Fixtures/spectrum-array/schema-binary.json,
-				Fixtures/spectrum-array/schema-json.json,
-				Fixtures/spectrum-array/system.json,
-				Fixtures/video-mjpeg/datastream.json,
-				Fixtures/video-mjpeg/obs-binary.bin,
-				Fixtures/video-mjpeg/obs-binary.index.json,
-				Fixtures/video-mjpeg/obs-omjson.json,
-				Fixtures/video-mjpeg/schema-binary.json,
-				Fixtures/video-mjpeg/system.json,
+				"Fixtures/kraken-doa/datastream.json",
+				"Fixtures/kraken-doa/obs-binary.bin",
+				"Fixtures/kraken-doa/obs-binary.index.json",
+				"Fixtures/kraken-doa/obs-json.json",
+				"Fixtures/kraken-doa/obs-omjson.json",
+				"Fixtures/kraken-doa/schema-binary.json",
+				"Fixtures/kraken-doa/schema-json.json",
+				"Fixtures/kraken-doa/system.json",
+				"Fixtures/kraken-settings/datastream.json",
+				"Fixtures/kraken-settings/obs-binary.bin",
+				"Fixtures/kraken-settings/obs-binary.index.json",
+				"Fixtures/kraken-settings/obs-json.json",
+				"Fixtures/kraken-settings/obs-omjson.json",
+				"Fixtures/kraken-settings/schema-binary.json",
+				"Fixtures/kraken-settings/schema-json.json",
+				"Fixtures/kraken-settings/system.json",
+				"Fixtures/lrf-range/datastream.json",
+				"Fixtures/lrf-range/obs-binary.bin",
+				"Fixtures/lrf-range/obs-binary.index.json",
+				"Fixtures/lrf-range/obs-json.json",
+				"Fixtures/lrf-range/obs-omjson.json",
+				"Fixtures/lrf-range/schema-binary.json",
+				"Fixtures/lrf-range/schema-json.json",
+				"Fixtures/lrf-range/source-subsystems.json",
+				"Fixtures/lrf-range/source-system.json",
+				"Fixtures/lrf-range/subsystems.json",
+				"Fixtures/lrf-range/system.json",
+				"Fixtures/lrf-target/datastream.json",
+				"Fixtures/lrf-target/obs-binary.bin",
+				"Fixtures/lrf-target/obs-binary.index.json",
+				"Fixtures/lrf-target/obs-json.json",
+				"Fixtures/lrf-target/obs-omjson.json",
+				"Fixtures/lrf-target/schema-binary.json",
+				"Fixtures/lrf-target/schema-json.json",
+				"Fixtures/lrf-target/source-subsystems.json",
+				"Fixtures/lrf-target/source-system.json",
+				"Fixtures/lrf-target/subsystems.json",
+				"Fixtures/lrf-target/system.json",
+				Fixtures/README.md,
+				"Fixtures/spectrum-array/datastream.json",
+				"Fixtures/spectrum-array/obs-binary.bin",
+				"Fixtures/spectrum-array/obs-binary.index.json",
+				"Fixtures/spectrum-array/obs-json.json",
+				"Fixtures/spectrum-array/obs-omjson.json",
+				"Fixtures/spectrum-array/schema-binary.json",
+				"Fixtures/spectrum-array/schema-json.json",
+				"Fixtures/spectrum-array/system.json",
+				"Fixtures/video-mjpeg/datastream.json",
+				"Fixtures/video-mjpeg/obs-binary.bin",
+				"Fixtures/video-mjpeg/obs-binary.index.json",
+				"Fixtures/video-mjpeg/obs-omjson.json",
+				"Fixtures/video-mjpeg/schema-binary.json",
+				"Fixtures/video-mjpeg/system.json",
 				Fixtures/weather/datastream.json,
-				Fixtures/weather/obs-binary.bin,
-				Fixtures/weather/obs-binary.index.json,
-				Fixtures/weather/obs-json.json,
-				Fixtures/weather/obs-omjson.json,
-				Fixtures/weather/schema-binary.json,
-				Fixtures/weather/schema-json.json,
+				"Fixtures/weather/obs-binary.bin",
+				"Fixtures/weather/obs-binary.index.json",
+				"Fixtures/weather/obs-json.json",
+				"Fixtures/weather/obs-omjson.json",
+				"Fixtures/weather/schema-binary.json",
+				"Fixtures/weather/schema-json.json",
 				Fixtures/weather/system.json,
 			);
 			target = 3A38D7962F74157D00D8BF3F /* osh-iosTests */;
@@ -401,6 +401,40 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		3A0OSHW01100000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3A0OSHPRIV0000000000003 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3A38D7882F74157B00D8BF3F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3A0OSHPRIV0000000000002 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3A38D7952F74157D00D8BF3F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3A0OSHFIXBLD000000000001 /* Fixtures in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3A38D79F2F74157D00D8BF3F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXShellScriptBuildPhase section */
 		3A0OSHVER00000000000001 /* Stamp build version from git */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -443,40 +477,6 @@
 			shellScript = "\"$SRCROOT/scripts/stamp-build-version.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
-
-/* Begin PBXResourcesBuildPhase section */
-		3A0OSHW01100000000000001 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				3A0OSHPRIV0000000000003 /* PrivacyInfo.xcprivacy in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		3A38D7882F74157B00D8BF3F /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				3A0OSHPRIV0000000000002 /* PrivacyInfo.xcprivacy in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		3A38D7952F74157D00D8BF3F /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				3A0OSHFIXBLD000000000001 /* Fixtures in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		3A38D79F2F74157D00D8BF3F /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		3A0OSHW01000000000000001 /* Sources */ = {
@@ -540,13 +540,13 @@
 				INFOPLIST_FILE = "OSHiOSWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "OSH Session";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.OSHiOSWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -568,13 +568,13 @@
 				INFOPLIST_FILE = "OSHiOSWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "OSH Session";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.OSHiOSWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -636,7 +636,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -694,7 +694,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -713,9 +713,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8B548M8H4W;
+				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				EXCLUDED_SOURCE_FILE_NAMES = "*.md";
-				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "osh-ios-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "OSH captures video from the camera and streams it to your OpenSensorHub server. Video is sent only to the server you configure.";
@@ -728,11 +728,12 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -749,9 +750,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8B548M8H4W;
+				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				EXCLUDED_SOURCE_FILE_NAMES = "*.md";
-				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "osh-ios-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "OSH captures video from the camera and streams it to your OpenSensorHub server. Video is sent only to the server you configure.";
@@ -764,11 +765,12 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -784,8 +786,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
-				MARKETING_VERSION = 0.9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -802,8 +804,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
-				MARKETING_VERSION = 0.9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -819,7 +821,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -835,7 +837,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 0.9.0;
+				MARKETING_VERSION = 0.9.1;
 				PRODUCT_BUNDLE_IDENTIFIER = org.opensensorhub.oshios.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;

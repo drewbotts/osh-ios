@@ -183,6 +183,9 @@ struct COPMapView: View {
                 toggle("Group nearby", "circle.grid.2x2", \.clusterMarkers)
             }
             Section {
+                // Two switches about "live" that mean different things: the
+                // first hides what has gone quiet, the second stops listening.
+                toggle("Live systems only", "bolt.horizontal.circle", \.liveOnly)
                 toggle("Live updates", "dot.radiowaves.up.forward", \.liveUpdates)
             }
         } label: {
@@ -231,13 +234,16 @@ struct COPMapView: View {
         }
     }
 
-    /// Why the map is empty, which is three different situations.
+    /// Why the map is empty, which is four different situations.
     private var emptyDescription: String {
         if !layers.nodeSystems && !layers.thisDevice {
             return "Every layer is switched off. Turn one on from the layers menu."
         }
         if connections.active == nil {
             return "No server is selected. Pick one on the Systems tab, or start a session to put this device on the map."
+        }
+        if model.hiddenSystemCount > 0 {
+            return "Live systems only is on and nothing on this node is live right now. Turn it off from the layers menu to see stale and offline systems."
         }
         return "No system on this node reports a location, and this device has no fix yet."
     }
@@ -261,6 +267,13 @@ struct COPMapView: View {
                 }
                 if !layers.liveUpdates {
                     Label("paused", systemImage: "pause.fill")
+                }
+                if model.hiddenSystemCount > 0 {
+                    // Said out loud for the same reason as decimation: a map
+                    // with three systems on it should not look like a node
+                    // with three systems on it.
+                    Label("\(model.hiddenSystemCount) not live, hidden",
+                          systemImage: "bolt.horizontal.circle")
                 }
                 if model.didDecimate {
                     // Said out loud rather than silently truncated: a partial

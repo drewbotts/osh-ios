@@ -71,6 +71,9 @@ final class COPMapModel: ObservableObject {
     @Published private(set) var targetHistory: [SystemMapView.TargetDot] = []
     /// True when more entities were found than `maxMarkers`.
     @Published private(set) var didDecimate = false
+    /// Systems left off the map by the Live-only layer: those that would have
+    /// drawn something and are stale or offline. Zero while the layer is off.
+    @Published private(set) var hiddenSystemCount = 0
 
     /// Freshness snapshot, refreshed when the tracker publishes.
     ///
@@ -200,6 +203,23 @@ final class COPMapModel: ObservableObject {
     /// Freshness of one system, for its marker.
     func activityState(_ systemId: String) -> ActivityState {
         activityStates[systemId] ?? .offline
+    }
+
+    /// Whether a system gets drawn at all under the current layers.
+    ///
+    /// The one gate for the Live-only layer, applied to markers, bearing lines
+    /// and targets alike. Filtering the system rather than the observation is
+    /// deliberate: a line of bearing is never aged out on its own, but when
+    /// the user asks for only what is live, a system that has gone quiet takes
+    /// everything it drew with it — half a system on the map would read as a
+    /// system with half its sensors broken.
+    func isDrawn(_ system: RemoteSystem) -> Bool {
+        !layers.liveOnly || activityState(system.id) == .live
+    }
+
+    /// Whether a system has anything the map would draw, live or not.
+    func drawsAnything(_ system: RemoteSystem) -> Bool {
+        system.hasPosition || !system.targetDatastreams.isEmpty
     }
 
     /// The full activity of one system, for a sheet or a detail row.
@@ -348,6 +368,9 @@ final class COPMapModel: ObservableObject {
         let built = buildMarkers()
         markers = built.markers
         didDecimate = built.decimated
+        hiddenSystemCount = layers.liveOnly && layers.nodeSystems
+            ? systems.filter { drawsAnything($0) && !isDrawn($0) }.count
+            : 0
         bearingLines = buildBearingLines()
         let targets = buildTargetOverlays()
         targetLines = targets.lines

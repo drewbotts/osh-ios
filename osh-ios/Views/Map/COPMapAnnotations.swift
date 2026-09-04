@@ -22,14 +22,14 @@ extension COPMapModel {
         guard layers.nodeSystems else { return ([], false) }
 
         var result: [SystemMapView.Marker] = []
-        for system in systems where system.hasPosition {
+        for system in systems where system.hasPosition && isDrawn(system) {
             result.append(contentsOf: markers(for: system))
         }
         // Target markers are not this system's position, so they are built
         // outside the loop above and for every system: a range finder with no
         // fix of its own still designates points, and those points are the
         // whole reason it is on the map.
-        for system in systems {
+        for system in systems where isDrawn(system) {
             result.append(contentsOf: targetMarkers(for: system))
         }
 
@@ -145,7 +145,7 @@ extension COPMapModel {
     /// A line per bearing datastream that has ever produced an observation.
     func buildBearingLines() -> [SystemMapView.BearingLine] {
         guard layers.nodeSystems, layers.bearingLines else { return [] }
-        return systems.flatMap { bearingLines(for: $0) }
+        return systems.filter(isDrawn).flatMap { bearingLines(for: $0) }
     }
 
     func bearingLines(for system: RemoteSystem) -> [SystemMapView.BearingLine] {
@@ -244,7 +244,7 @@ extension COPMapModel {
         var lines: [SystemMapView.TargetLine] = []
         var history: [SystemMapView.TargetDot] = []
 
-        for system in systems {
+        for system in systems where isDrawn(system) {
             for datastream in system.targetDatastreams {
                 let current = targets(system: system, datastream: datastream)
 

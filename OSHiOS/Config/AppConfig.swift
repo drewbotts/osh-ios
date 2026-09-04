@@ -112,9 +112,10 @@ struct AppConfig: Codable {
 /// What the common operating picture draws.
 ///
 /// Every field defaults to on — a map that opened with half its layers hidden
-/// would look like a broken node rather than a configured view — with one
-/// exception. `targetHistory` draws every past target rather than the current
-/// one, which is a question the user has to ask.
+/// would look like a broken node rather than a configured view — with two
+/// exceptions. `targetHistory` draws every past target rather than the current
+/// one, and `liveOnly` hides everything that has gone quiet; both are questions
+/// the user has to ask.
 struct MapLayers: Codable, Equatable, Sendable {
     var thisDevice = true
     var nodeSystems = true
@@ -129,6 +130,12 @@ struct MapLayers: Codable, Equatable, Sendable {
     var targetHistory = false
     /// The old Node-map "Live" switch: whether node systems hold subscriptions.
     var liveUpdates = true
+    /// Draw only node systems whose activity is `.live`; hide the stale and the
+    /// offline. Off by default because a station that last spoke in June is
+    /// still a station, and a map that quietly dropped it would be lying about
+    /// the node. This is the opposite filter to `liveUpdates`: that one stops
+    /// new data arriving, this one hides what has stopped arriving.
+    var liveOnly = false
 
     init() {}
 
@@ -144,6 +151,7 @@ struct MapLayers: Codable, Equatable, Sendable {
         targetHistory = try c.decodeIfPresent(Bool.self, forKey: .targetHistory) ?? fallback.targetHistory
         clusterMarkers = try c.decodeIfPresent(Bool.self, forKey: .clusterMarkers) ?? fallback.clusterMarkers
         liveUpdates  = try c.decodeIfPresent(Bool.self, forKey: .liveUpdates)  ?? fallback.liveUpdates
+        liveOnly     = try c.decodeIfPresent(Bool.self, forKey: .liveOnly)     ?? fallback.liveOnly
     }
 }
 

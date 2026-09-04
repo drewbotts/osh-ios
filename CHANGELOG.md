@@ -5,6 +5,23 @@ than by release, because the app has not shipped a versioned build yet.
 
 ---
 
+## Unreleased
+
+### Added
+
+**"Live systems only" on the Map layers menu**, `MapLayers.liveOnly`, off by
+default. The menu already had a "Live updates" switch, but that one answers a
+bandwidth question — stop listening — and the more useful question on a busy
+node is the reverse: hide what has stopped talking. With the layer on, a node
+system whose activity is stale or offline draws nothing at all: not its marker,
+not its bearing lines, not its targets. The gate is per system rather than per
+observation (`COPMapModel.isDrawn`), so a system never shows up half-drawn. The
+legend says how many systems are hidden, and the empty-map message names the
+layer when it is the reason nothing is on screen. This device is unaffected; a
+phone with a fix is live by construction.
+
+---
+
 ## Pass 3e — reaching a remote node (0.9.1)
 
 A node on a remote address could not be connected to at all while a node on the

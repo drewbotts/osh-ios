@@ -31,8 +31,8 @@ struct DecodedFrame: @unchecked Sendable {
 // main actor, and a SystemLiveSession is @MainActor. Isolation is what
 // guarantees the work lands somewhere else.
 //
-// H.264 is Pass 3d. Those blocks are counted and sized here so the card can
-// prove the stream is alive, and nothing is decoded.
+// H.264 is the other decoder, H264Decoder: stateful, one per stream, and
+// chosen over this one by VideoCodec.
 
 actor MJPEGDecoder {
 
@@ -98,18 +98,14 @@ actor MJPEGDecoder {
 
     /// Whether a compression code names something this decoder can read.
     ///
-    /// Nodes spell it "JPEG" and "MJPEG"; a missing code on a stream that turns
-    /// out to be JPEG is handled by the decode attempt failing harmlessly.
+    /// The recognition itself lives in VideoCodec; this is kept as the
+    /// question a caller holding a JPEG decoder actually asks.
     nonisolated static func canDecode(compression: String?) -> Bool {
-        guard let compression else { return false }
-        let normalized = compression.lowercased()
-        return normalized.contains("jpeg") || normalized.contains("jpg")
+        VideoCodec(compression: compression) == .jpeg
     }
 
-    /// Whether a compression code names H.264, which Pass 3d will decode.
+    /// Whether a compression code names H.264, which H264Decoder handles.
     nonisolated static func isH264(compression: String?) -> Bool {
-        guard let compression else { return false }
-        let normalized = compression.lowercased()
-        return normalized.contains("264") || normalized.contains("avc")
+        VideoCodec(compression: compression) == .h264
     }
 }

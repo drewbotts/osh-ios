@@ -137,6 +137,48 @@ Whole numbers are written with a `.0`. Not required by JSON — the node accepts
 `3` — but it is how the node echoes them back in its own listing, which keeps a
 captured request and a captured response comparable by eye.
 
+## A second camera: moves by name
+
+Verified 2026-09-04 against the same node's DR-CAMERA
+(`urn:uuid:c7ea1e95-5b17-4de3-8a9b-0bc5bdf6479f`, control stream
+`03fdhisrs8s0`). Its `ptzControl` is also a `DataChoice`, but of two `Text`
+items and nothing else — no Quantity anywhere:
+
+| Item | Definition | AllowedTokens |
+|---|---|---|
+| `preset` | `…/CameraPresetPositionName` | `Reset`, `TopMost`, `BottomMost`, `LeftMost`, `RightMost` |
+| `relMove` | `…/CameraRelativeMovementName` | `Up`, `Down`, `Left`, `Right`, `TopLeft`, `TopRight`, `BottomLeft`, `BottomRight` |
+
+The schema is captured as `osh-iosTests/Fixtures/named-ptz-control/control-schema.json`.
+
+A move is the token, spelled as the schema spells it:
+
+```
+POST {"parameters":{"relMove":"Left"}}
+```
+```json
+{
+  "command@id": "03fdhisrs8s01pt2tfa0c34tk2g0",
+  "reportTime": "2026-09-04T14:10:49.376780270Z",
+  "statusCode": "COMPLETED",
+  "executionTime": [
+    "2026-09-04T14:10:49.376762714Z",
+    "2026-09-04T14:10:49.376762714Z"
+  ]
+}
+```
+
+Two things differ from the Axis camera. The response arrives about two seconds
+after the request — this driver reports `COMPLETED` once the camera has moved,
+not once the command was accepted — which is why the controller's one-in-flight
+rule matters more here, and why a held D-pad button on this camera repeats at
+the camera's pace rather than the timer's. And how far one `Left` moves is the
+driver's decision; the app's step-size setting does not apply and the overlay
+does not show it.
+
+`PTZCapability.NamedMoves` is the recognition; `PTZController.move(_:)` sends
+it. See `Viewer/ROLES.md` for the rule.
+
 ## Reading a command's status
 
 There is no per-command resource:

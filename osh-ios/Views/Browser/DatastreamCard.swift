@@ -323,19 +323,19 @@ struct DatastreamCard: View {
     @ViewBuilder
     private func videoCardBody(compression: String?) -> some View {
         let isPlaying = state.isLive
-        if MJPEGDecoder.isH264(compression: compression) {
+        if VideoCodec(compression: compression).isDecodable {
+            VideoFrameView(latestFrame: session.frames[datastream.id],
+                           stats: session.blockStats[datastream.id],
+                           compression: compression,
+                           isPlaying: isPlaying,
+                           onPlay: { session.start(datastreamId: datastream.id) },
+                           onPause: { session.stop(datastreamId: datastream.id) })
+        } else {
             UnsupportedCodecView(compression: compression,
                                  stats: session.blockStats[datastream.id],
                                  isPlaying: isPlaying,
                                  onPlay: { session.start(datastreamId: datastream.id) },
                                  onPause: { session.stop(datastreamId: datastream.id) })
-        } else {
-            MJPEGView(latestFrame: session.frames[datastream.id],
-                      stats: session.blockStats[datastream.id],
-                      compression: compression,
-                      isPlaying: isPlaying,
-                      onPlay: { session.start(datastreamId: datastream.id) },
-                      onPause: { session.stop(datastreamId: datastream.id) })
         }
     }
 

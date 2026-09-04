@@ -66,8 +66,8 @@ struct VideoWallView: View {
         }
     }
 
-    /// Two up in portrait, three across in landscape. Any more and an MJPEG
-    /// tile is smaller than the frames arriving into it.
+    /// Two up in portrait, three across in landscape. Any more and a tile is
+    /// smaller than the frames arriving into it.
     private func columns(for size: CGSize) -> [GridItem] {
         let count = size.width > size.height ? 3 : 2
         return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
@@ -290,12 +290,12 @@ struct NodeVideoTile: View {
                 .font(.caption2)
                 .foregroundStyle(.white.opacity(0.8))
         } else if !tile.isDecodable {
-            // Not an error: an H.264 camera is working perfectly and the app
-            // has not learned to draw it yet. The arrival figures below say so.
+            // Not an error: the camera is working and the app has no decoder
+            // for its codec. The arrival figures below say so.
             VStack(spacing: 3) {
                 Image(systemName: "film.stack")
                 Text(tile.compression ?? "codec")
-                Text("preview not yet supported")
+                Text("preview not supported")
             }
             .font(.caption2)
             .multilineTextAlignment(.center)

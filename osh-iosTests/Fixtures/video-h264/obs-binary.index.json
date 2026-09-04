@@ -1,0 +1,12 @@
+{
+  "source": "websocket",
+  "messageLengths": [
+    75015,
+    5486,
+    5418,
+    5493,
+    5430,
+    5483
+  ],
+  "note": "Captured from the live WebSocket stream; each length is one WebSocket message. Six consecutive frames starting at an IDR: SPS, PPS and the keyframe first, then five P-frames that depend on it."
+}

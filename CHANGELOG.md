@@ -9,6 +9,41 @@ than by release, because the app has not shipped a versioned build yet.
 
 ### Added
 
+**PTZ cameras that move by name** (`PTZCapability.NamedMoves`). The reference
+node's second camera, DR-CAMERA, has a `ptzControl` of two `Text` items and no
+Quantity anywhere: a `preset` with five allowed names, and a `relMove` whose
+tokens are `Up`, `Down`, `Left`, `Right` and the four diagonals. Detection now
+recognises a Text item defined as a relative movement whose AllowedTokens read
+as directions — both signals required — and the camera qualifies as PTZ when
+all four cardinal moves are present. The D-pad is unchanged for the Axis camera
+and drives this one with the camera's own tokens; when the schema names
+diagonals, they fill the pad's corners. The step-size control disappears for a
+camera the step means nothing to. A `Text` preset with a token list becomes a
+menu instead of a field (`Axis.tokens`). Verified on the node:
+`{"parameters":{"relMove":"Left"}}` answered `COMPLETED`, about two seconds
+after the request. Fixture `named-ptz-control`; six new assertions in
+`PTZCapabilityTests`, including the two refusals. `COMMANDS.md` and `ROLES.md`
+record the exchange and the rule.
+
+**H.264 video decodes** (`Viewer/Video/H264Decoder.swift`). The node's H.264
+cameras — and another phone running this app — now render on the video wall,
+in the full-screen player and on the dashboard card, where before they showed a
+placeholder with arrival figures. Each observation is one Annex-B access unit;
+the decoder splits it into NAL units, keeps the SPS and PPS, builds a
+`CMVideoFormatDescription` from them, repacks the slices as AVCC and decodes
+synchronously through a `VTDecompressionSession` requesting BGRA, so the
+`CGImage` handed to SwiftUI is a wrap of the decoder's output. One decoder per
+stream, because it is stateful: slices before the first IDR are dropped rather
+than painted against references the decoder never had, a change of parameter
+sets rebuilds the format description (and the session, when it cannot take the
+new one), and a session the system revokes — the app backgrounded — is rebuilt
+from the parameter sets already held. `VideoCodec` is the one place that turns
+a Block's `compression` code into a decoder choice; `MJPEGView` is
+`VideoFrameView`, since it now draws both. Fixture `video-h264` captures six
+consecutive frames from the reference node's DR-CAMERA starting at a keyframe,
+and `H264DecoderTests` decode them, feed them tail-first to prove the keyframe
+wait, and check the Annex-B and AVCC splitting.
+
 **"Live systems only" on the Map layers menu**, `MapLayers.liveOnly`, off by
 default. The menu already had a "Live updates" switch, but that one answers a
 bandwidth question — stop listening — and the more useful question on a busy

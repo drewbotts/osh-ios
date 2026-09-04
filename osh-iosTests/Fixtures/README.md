@@ -59,10 +59,12 @@ successive `limit=N` responses because the datastream is archive-only.
 | `ais-vessel-location` | AIS vesselLocation | Boolean, Category, Text, Count, Vector, `nilValues` |
 | `spectrum-array` | KrakenSDR Spectrum | two variable-size DataArrays sized by `elementCount` href |
 | `video-mjpeg` | Axis PTZ video1 | nested DataArray delivered as one JPEG block; no swe+json schema |
+| `video-h264` | DR-CAMERA video | six consecutive Annex-B H.264 frames: an IDR with SPS/PPS prepended, then five P-frames that depend on it |
 | `gps` | Android gps_data | Time + Vector — the shape this app itself writes |
 | `kraken-settings` | KrakenSDR settings | deeply nested DataRecord; a position at `/stationConfig/location` with a heading beside it |
 | `kraken-doa` | KrakenSDR DoA | a line of bearing with a confidence figure, and the station's own position stamped on every record |
-| `choice-ptz-control` | Axis ptzControl | the node's only DataChoice; seeds Pass 4 |
+| `choice-ptz-control` | Axis ptzControl | a DataChoice of Quantity axes, a Text preset and a ptzPos record; seeds Pass 4 |
+| `named-ptz-control` | DR-CAMERA ptzControl | a DataChoice of two Text items with AllowedTokens — presets by name, relative moves by direction name |
 | `lrf-target` | TruPulse 360 targetLoc | a location vector that is *not* the system's position — the shape the `.target` role exists for |
 | `lrf-range` | TruPulse 360 rangeData | an azimuth and two distances with no location vector: must stay a `.bearing` |
 

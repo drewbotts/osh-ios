@@ -44,9 +44,9 @@ final class SystemLiveSession: ObservableObject {
 
     /// Arrival figures for a block (video) stream.
     ///
-    /// Kept for H.264 as well as JPEG: Pass 3b decodes no H.264, and these
-    /// numbers are the only way a user can tell "not supported yet" from
-    /// "not arriving".
+    /// Kept whether or not the codec is one the app can draw: for one it is
+    /// not, these numbers are the only way a user can tell "not supported"
+    /// from "not arriving".
     struct BlockStats: Equatable, Sendable {
         var frames = 0
         var lastByteCount = 0
@@ -110,6 +110,11 @@ final class SystemLiveSession: ObservableObject {
     /// Recent arrival times per block stream, for the rolling fps figure.
     private var blockArrivals: [String: [Date]] = [:]
 
+    /// One H.264 decoder per stream that needs one. Stateful — it holds the
+    /// parameter sets and the reference pictures — so it is dropped with the
+    /// stream and a restart begins again at the next keyframe.
+    private var h264Decoders: [String: H264Decoder] = [:]
+
     // MARK: Init
 
     init(system: RemoteSystem, connection: NodeConnection) {
@@ -166,6 +171,7 @@ final class SystemLiveSession: ObservableObject {
         streams[datastreamId] = nil
         consumers[datastreamId]?.cancel()
         consumers[datastreamId] = nil
+        h264Decoders[datastreamId] = nil
         streamState[datastreamId] = .idle
     }
 
@@ -182,6 +188,7 @@ final class SystemLiveSession: ObservableObject {
 
         for consumer in consumers.values { consumer.cancel() }
         consumers.removeAll()
+        h264Decoders.removeAll()
 
         releaseTask?.cancel()
         releaseTask = nil
@@ -358,11 +365,25 @@ final class SystemLiveSession: ObservableObject {
                                       serverId: connection.server.id,
                                       systemId: system.id)
 
-        guard MJPEGDecoder.canDecode(compression: codec) else { return }
-        if let frame = await MJPEGDecoder.shared.decode(data,
-                                                        timestamp: observation.phenomenonTime) {
-            frames[datastreamId] = frame
+        let decoded: DecodedFrame?
+        switch VideoCodec(compression: codec) {
+        case .jpeg:
+            decoded = await MJPEGDecoder.shared.decode(data, timestamp: observation.phenomenonTime)
+        case .h264:
+            let decoder = h264Decoders[datastreamId] ?? {
+                let created = H264Decoder()
+                h264Decoders[datastreamId] = created
+                return created
+            }()
+            decoded = await decoder.decode(data, timestamp: observation.phenomenonTime)
+        case .unsupported:
+            return
         }
+
+        // The stream may have been stopped while the decoder was busy; a frame
+        // landing after that would undo the "paused" state the view just drew.
+        guard let decoded, streams[datastreamId] != nil else { return }
+        frames[datastreamId] = decoded
     }
 
     private func recordBlockArrival(datastreamId: String, byteCount: Int) {

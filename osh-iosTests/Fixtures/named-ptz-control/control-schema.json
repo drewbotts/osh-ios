@@ -1,0 +1,41 @@
+{
+  "paramsSchema": {
+    "type": "DataChoice",
+    "name": "ptzControl",
+    "items": [
+      {
+        "type": "Text",
+        "name": "preset",
+        "definition": "http://sensorml.com/ont/swe/property/CameraPresetPositionName",
+        "label": "Preset Camera Position",
+        "constraint": {
+          "values": [
+            "Reset",
+            "TopMost",
+            "BottomMost",
+            "LeftMost",
+            "RightMost"
+          ]
+        }
+      },
+      {
+        "type": "Text",
+        "name": "relMove",
+        "definition": "http://sensorml.com/ont/swe/property/CameraRelativeMovementName",
+        "label": "Camera Relative Movements",
+        "constraint": {
+          "values": [
+            "Up",
+            "Down",
+            "Left",
+            "Right",
+            "TopLeft",
+            "TopRight",
+            "BottomLeft",
+            "BottomRight"
+          ]
+        }
+      }
+    ]
+  }
+}

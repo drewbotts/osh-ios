@@ -1,0 +1,63 @@
+{
+  "id": "02o87p5ao4sg",
+  "name": "DR-CAMERA - video",
+  "system@id": "037bvukpipe0",
+  "system@link": {
+    "href": "http://192.168.4.34:8080/sensorhub/api/systems/037bvukpipe0?f=json",
+    "uid": "urn:uuid:c7ea1e95-5b17-4de3-8a9b-0bc5bdf6479f",
+    "type": "application/geo+json"
+  },
+  "outputName": "video",
+  "validTime": [
+    "2026-09-04T01:48:25.869Z",
+    "now"
+  ],
+  "phenomenonTime": [
+    "2026-09-04T13:14:40.809Z",
+    "2026-09-04T13:14:40.809Z"
+  ],
+  "observedProperties": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/RasterImage"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/RedChannel"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/GreenChannel"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/BlueChannel"
+    }
+  ],
+  "resultType": "coverage",
+  "formats": [
+    "application/om+json",
+    "application/swe+binary"
+  ],
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02o87p5ao4sg",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This datastream resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02o87p5ao4sg?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "system",
+      "title": "Parent system",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/037bvukpipe0?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "observations",
+      "title": "Observations",
+      "href": "http://192.168.4.34:8080/sensorhub/api/datastreams/02o87p5ao4sg/observations?f=json",
+      "type": "application/json"
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import SwiftUI
 // already compressed and on their way to the node — so the numbers are the
 // whole card.
 //
-// Its remote counterpart is MJPEGView, which has actual pixels to draw.
+// Its remote counterpart is VideoFrameView, which has actual pixels to draw.
 
 struct VideoBadgeView: View {
 

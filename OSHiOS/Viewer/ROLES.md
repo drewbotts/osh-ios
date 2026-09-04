@@ -271,6 +271,7 @@ author being explicit, and a name must not override it.
 | `absoluteZoom` | `ZoomFactor`, and **not** `Relative` | `zoom` |
 | `preset`       | `Preset`, on a `Text` item           | `preset` |
 | `position`     | a `DataRecord` whose fields resolve to all three absolute axes | — |
+| `namedMoves`   | `RelativeMovement`, on a `Text` item **with** `AllowedTokens` that read as directions | `relMove`, `move`, `movement`, `direction` |
 
 The relative rules are tested before the absolute ones, and the absolute ones
 refuse anything the schema calls relative. Both halves of that matter:
@@ -285,11 +286,30 @@ refuse. The reference Axis camera bounds pan to `[-180, 180]`, tilt to
 relative axes — which is why the step size is the app's choice and not the
 schema's.
 
+**Named moves.** The second camera on the reference node has no Quantity at
+all: its relative movement is a `Text` whose tokens are `Up`, `Down`, `Left`,
+`Right` and the four diagonals. Recognising it takes both signals — a movement
+definition (or, with none, a movement-like name) *and* a token list that reads
+as directions. Tokens are read for the words in them rather than matched
+exactly: `up` and `top` mean up, `bottom` and `down` mean down, and a token
+carrying a vertical and a horizontal word is a diagonal, so `TopLeft`,
+`up-left` and `BOTTOM_RIGHT` all land. The token the camera declared is what is
+sent, in its own spelling. A `Text` preset with `AllowedTokens` keeps them too
+(`Axis.tokens`), which is what turns the preset field into a menu.
+
 **The refusal.** `detect` returns nil unless a *pair* of pan and tilt axes
-exists, relative or absolute. A lone zoom control is a zoom control; calling it
-a PTZ camera and drawing a pad for it would be a lie the user discovers by
-pressing a button that does nothing. Everything that fails detection gets its
-parameter tree read-only on the dashboard instead.
+exists — relative or absolute — or a named-move item offers all four cardinal
+directions. A lone zoom control is a zoom control, and `Left`/`Right` alone is
+a panner; calling either a PTZ camera and drawing a pad for it would be a lie
+the user discovers by pressing a button that does nothing. Everything that
+fails detection gets its parameter tree read-only on the dashboard instead.
+
+**Driving it.** `PTZController.pan` and `.tilt` send a quantity when the camera
+has that axis and the named token otherwise, so the same four arrows drive
+both cameras; `.move(_:)` sends any direction by name and is the only route to
+a diagonal, because a quantity camera would need two commands for one. The
+step-size control appears only for quantity axes — a camera that takes
+"Left" moves however far its driver decided.
 
 **Extending it.** A new command family is a new type beside `PTZCapability`, not
 a case inside it: detection, the controls and the parameter builder travel

@@ -145,6 +145,110 @@ struct PTZCapabilityTests {
         #expect(capability?.supportsAbsolute == false)
     }
 
+    // MARK: Named moves
+
+    private static func namedFixtureCapability() throws -> PTZCapability {
+        let data = try FixtureLoader.requiredData(.namedPTZControl, "control-schema.json")
+        let schema = try SWESchemaDecoder.decode(data).recordSchema
+        return try #require(PTZCapability.detect(in: schema, controlStreamId: "03fdhisrs8s0"))
+    }
+
+    /// The second camera on the reference node: no Quantity anywhere, two Text
+    /// items with token lists. It is a PTZ camera because "Up", "Down", "Left"
+    /// and "Right" are all there — and the pad drives it with names.
+    @Test("A camera that moves by direction name is recognised")
+    func detectsNamedMoves() throws {
+        let capability = try Self.namedFixtureCapability()
+
+        #expect(capability.supportsDPad)
+        #expect(!capability.supportsQuantityDPad)
+        #expect(!capability.supportsAbsolute)
+        #expect(capability.relativePan == nil)
+        #expect(capability.relativeTilt == nil)
+
+        let moves = try #require(capability.namedMoves)
+        #expect(moves.itemName == "relMove")
+        #expect(moves.supportsDPad)
+        #expect(moves.hasDiagonals)
+    }
+
+    @Test("Every token keeps the camera's own spelling")
+    func namedMoveTokens() throws {
+        let moves = try #require(try Self.namedFixtureCapability().namedMoves)
+
+        #expect(moves.token(for: .up) == "Up")
+        #expect(moves.token(for: .down) == "Down")
+        #expect(moves.token(for: .left) == "Left")
+        #expect(moves.token(for: .right) == "Right")
+        #expect(moves.token(for: .upLeft) == "TopLeft")
+        #expect(moves.token(for: .upRight) == "TopRight")
+        #expect(moves.token(for: .downLeft) == "BottomLeft")
+        #expect(moves.token(for: .downRight) == "BottomRight")
+    }
+
+    /// The preset on this camera lists its names, so the overlay can offer a
+    /// menu rather than a field. The Axis one does not, and must not grow a
+    /// token list from nowhere.
+    @Test("Preset tokens are carried when the schema lists them, and only then")
+    func presetTokens() throws {
+        let named = try Self.namedFixtureCapability()
+        #expect(named.preset?.itemName == "preset")
+        #expect(named.preset?.tokens == ["Reset", "TopMost", "BottomMost", "LeftMost", "RightMost"])
+
+        let axis = try Self.fixtureCapability()
+        #expect(axis.preset?.itemName == "preset")
+        #expect(axis.preset?.tokens == nil)
+        #expect(axis.namedMoves == nil)
+    }
+
+    @Test("Direction words are read in any casing or joining")
+    func directionSpellings() {
+        let text = SWEText(definition: "http://x/CameraRelativeMovementName",
+                           label: nil,
+                           constraint: AllowedTokens(values: ["UP", "down", "left", "RIGHT",
+                                                              "up-left", "BOTTOM_RIGHT", "Stop"]))
+        let moves = PTZCapability.namedMoves(named: "move", text: text)
+        #expect(moves?.token(for: .up) == "UP")
+        #expect(moves?.token(for: .downRight) == "BOTTOM_RIGHT")
+        #expect(moves?.token(for: .upLeft) == "up-left")
+        #expect(moves?.token(for: .downLeft) == nil)
+        #expect(moves?.supportsDPad == true)
+    }
+
+    /// Two rules, both needed. A Text called "mode" with direction-like tokens
+    /// is not a move; a Text defined as a movement with no token list gives
+    /// the app nothing it could send.
+    @Test("A named-move item needs both a movement definition and direction tokens")
+    func namedMovesNeedBothSignals() {
+        let wrongDefinition = SWEText(definition: "http://x/OperatingMode",
+                                      label: nil,
+                                      constraint: AllowedTokens(values: ["Up", "Down", "Left", "Right"]))
+        #expect(PTZCapability.namedMoves(named: "mode", text: wrongDefinition) == nil)
+
+        let noTokens = SWEText(definition: "http://x/CameraRelativeMovementName", label: nil)
+        #expect(PTZCapability.namedMoves(named: "relMove", text: noTokens) == nil)
+
+        let notDirections = SWEText(definition: "http://x/CameraRelativeMovementName",
+                                    label: nil,
+                                    constraint: AllowedTokens(values: ["Fast", "Slow"]))
+        #expect(PTZCapability.namedMoves(named: "relMove", text: notDirections) == nil)
+    }
+
+    /// Left and Right alone is a panner. Without Up and Down there is no pad,
+    /// and with nothing else on the choice there is no PTZ camera.
+    @Test("Named moves without all four cardinal directions do not make a PTZ camera")
+    func namedMovesNeedFourDirections() {
+        let choice = SWEDataChoice(
+            definition: nil, label: nil, description: nil, choiceValue: nil,
+            items: [
+                DataField(name: "relMove",
+                          component: SWEText(definition: "http://x/CameraRelativeMovementName",
+                                             label: nil,
+                                             constraint: AllowedTokens(values: ["Left", "Right"])))
+            ])
+        #expect(PTZCapability.detect(in: choice, controlStreamId: "c") == nil)
+    }
+
     /// Definitions before names, but names when there is no definition — which
     /// is how a driver that only spells its items survives.
     @Test("Bare item names are recognised when nothing defines them")

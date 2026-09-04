@@ -168,6 +168,8 @@ PY
 #   kraken-doa          direction-finding LOB; emits only on detection, so its
 #                       binary capture comes from REST rather than the socket
 #   choice-ptz-control  control stream whose paramsSchema is a DataChoice
+#   named-ptz-control   a PTZ control stream of two Text items with AllowedTokens:
+#                       presets by name, and relative moves by direction name
 #   lrf-target          a laser range finder's target point: Time + a Vector
 #                       defined as FeatureOfInterestLocation, observed from a
 #                       phone that the record never names
@@ -213,6 +215,7 @@ RELATED_SYSTEMS = {
 # slug -> (system id, control stream id)
 CONTROL_STREAMS = [
     ("choice-ptz-control", "02luf9f2mgag", "025svjetu8qg"),
+    ("named-ptz-control",  "037bvukpipe0", "03fdhisrs8s0"),
 ]
 
 def write(slug, name, data):

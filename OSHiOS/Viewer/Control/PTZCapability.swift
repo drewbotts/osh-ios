@@ -15,6 +15,14 @@ import Foundation
 // URI the driver author chose deliberately; a name is a JSON key that happened
 // to be short. `rpan` is the reference node's spelling and is accepted, but
 // `http://sensorml.com/ont/swe/property/RelativePan` is the thing that means it.
+//
+// Two shapes of relative movement are recognised, and a camera may offer either
+// or both. The Axis camera takes a *quantity* per axis — pan by 3°, tilt by −5°.
+// A second camera on the reference node takes a *name* — a Text item whose
+// allowed tokens are "Up", "Down", "Left", "Right" and the four diagonals — and
+// moves a fixed amount the driver decides. The D-pad is the same either way;
+// what changes is the value a press sends, and whether a step size means
+// anything.
 
 struct PTZCapability: Sendable, Equatable {
 
@@ -30,6 +38,52 @@ struct PTZCapability: Sendable, Equatable {
         /// reference camera is unbounded, which is why a step size is the app's
         /// choice rather than the schema's.
         let range: ClosedRange<Double>?
+        /// From a Text item's AllowedTokens, when it declares them: the preset
+        /// names a camera will actually accept. nil when the schema leaves the
+        /// vocabulary open, which is when a free-text field is honest.
+        let tokens: [String]?
+
+        init(itemName: String, range: ClosedRange<Double>? = nil, tokens: [String]? = nil) {
+            self.itemName = itemName
+            self.range = range
+            self.tokens = tokens
+        }
+    }
+
+    // MARK: Named moves
+
+    /// Relative movement by name: one Text item whose allowed tokens are
+    /// directions, and which token means which direction.
+    ///
+    /// The tokens are kept exactly as the schema spells them — "TopLeft", not
+    /// a normalised form — because that spelling is what the camera accepts.
+    struct NamedMoves: Sendable, Equatable {
+        enum Direction: CaseIterable, Sendable {
+            case up, down, left, right
+            case upLeft, upRight, downLeft, downRight
+
+            var isDiagonal: Bool {
+                switch self {
+                case .up, .down, .left, .right: return false
+                default:                        return true
+                }
+            }
+        }
+
+        let itemName: String
+        let tokens: [Direction: String]
+
+        /// The token to send for a direction, or nil when the camera has none.
+        func token(for direction: Direction) -> String? { tokens[direction] }
+
+        /// A pad needs all four cardinal moves; a camera offering only
+        /// "Left" and "Right" is a panner, not a PTZ.
+        var supportsDPad: Bool {
+            tokens[.up] != nil && tokens[.down] != nil
+                && tokens[.left] != nil && tokens[.right] != nil
+        }
+
+        var hasDiagonals: Bool { tokens.keys.contains { $0.isDiagonal } }
     }
 
     // MARK: Position record
@@ -65,8 +119,38 @@ struct PTZCapability: Sendable, Equatable {
     /// The combined absolute record, when the schema offers one.
     let position: PositionRecord?
 
-    /// A four-way pad needs both relative axes; one of them is a slider.
-    var supportsDPad: Bool { relativePan != nil && relativeTilt != nil }
+    /// Relative movement by direction name, when the schema offers it.
+    let namedMoves: NamedMoves?
+
+    init(controlStreamId: String,
+         relativePan: Axis? = nil,
+         relativeTilt: Axis? = nil,
+         relativeZoom: Axis? = nil,
+         absolutePan: Axis? = nil,
+         absoluteTilt: Axis? = nil,
+         absoluteZoom: Axis? = nil,
+         preset: Axis? = nil,
+         position: PositionRecord? = nil,
+         namedMoves: NamedMoves? = nil) {
+        self.controlStreamId = controlStreamId
+        self.relativePan = relativePan
+        self.relativeTilt = relativeTilt
+        self.relativeZoom = relativeZoom
+        self.absolutePan = absolutePan
+        self.absoluteTilt = absoluteTilt
+        self.absoluteZoom = absoluteZoom
+        self.preset = preset
+        self.position = position
+        self.namedMoves = namedMoves
+    }
+
+    /// Both quantity axes, or a full set of named directions; one relative
+    /// axis alone is a slider, not a pad.
+    var supportsDPad: Bool { supportsQuantityDPad || namedMoves?.supportsDPad == true }
+
+    /// True when a pad press sends a number of degrees, which is the only
+    /// case a step size applies to.
+    var supportsQuantityDPad: Bool { relativePan != nil && relativeTilt != nil }
 
     /// True when anything at all can be driven absolutely.
     var supportsAbsolute: Bool {
@@ -81,10 +165,11 @@ struct PTZCapability: Sendable, Equatable {
     ///   or the single-field record SWESchemaDecoder wraps a non-record root
     ///   in — both arrive here depending on how the caller decoded, and
     ///   rejecting one of them would make detection depend on a wrapper.
-    /// - Returns: nil unless the schema offers a *pair* of pan and tilt axes,
-    ///   relative or absolute. A lone zoom control is a zoom control; calling
-    ///   it a PTZ camera and drawing a D-pad for it would be a lie the user
-    ///   discovers by pressing a button that does nothing.
+    /// - Returns: nil unless the schema offers a *pair* of pan and tilt axes
+    ///   — relative or absolute — or a named-move item with all four cardinal
+    ///   directions. A lone zoom control is a zoom control; calling it a PTZ
+    ///   camera and drawing a D-pad for it would be a lie the user discovers
+    ///   by pressing a button that does nothing.
     static func detect(in schema: DataComponent,
                        controlStreamId: String) -> PTZCapability? {
 
@@ -94,6 +179,7 @@ struct PTZCapability: Sendable, Equatable {
         var absolutePan: Axis?, absoluteTilt: Axis?, absoluteZoom: Axis?
         var preset: Axis?
         var position: PositionRecord?
+        var namedMoves: NamedMoves?
 
         for item in choice.items {
             if let record = item.component as? DataRecord {
@@ -101,7 +187,10 @@ struct PTZCapability: Sendable, Equatable {
                 continue
             }
 
-            let axis = Axis(itemName: item.name, range: range(of: item.component))
+            let text = item.component as? SWEText
+            let axis = Axis(itemName: item.name,
+                            range: range(of: item.component),
+                            tokens: text?.constraint?.values)
             let definition = item.component.definition
             let name = item.name.lowercased()
 
@@ -113,6 +202,11 @@ struct PTZCapability: Sendable, Equatable {
                 relativeTilt = axis
             } else if relativeZoom == nil, matches(definition, "RelativeZoom", name, ["rzoom"]) {
                 relativeZoom = axis
+            } else if namedMoves == nil, let text,
+                      let moves = Self.namedMoves(named: item.name, text: text) {
+                // Before the preset rule: both are Text items, and a token list
+                // of directions is the stronger evidence of the two.
+                namedMoves = moves
             } else if preset == nil, item.component is SWEText,
                       matches(definition, "Preset", name, ["preset"]) {
                 preset = axis
@@ -127,7 +221,8 @@ struct PTZCapability: Sendable, Equatable {
 
         let hasRelativePair = relativePan != nil && relativeTilt != nil
         let hasAbsolutePair = (absolutePan != nil && absoluteTilt != nil) || position != nil
-        guard hasRelativePair || hasAbsolutePair else { return nil }
+        let hasNamedPad = namedMoves?.supportsDPad == true
+        guard hasRelativePair || hasAbsolutePair || hasNamedPad else { return nil }
 
         return PTZCapability(controlStreamId: controlStreamId,
                              relativePan: relativePan,
@@ -137,7 +232,60 @@ struct PTZCapability: Sendable, Equatable {
                              absoluteTilt: absoluteTilt,
                              absoluteZoom: absoluteZoom,
                              preset: preset,
-                             position: position)
+                             position: position,
+                             namedMoves: namedMoves)
+    }
+
+    // MARK: Named moves
+
+    /// A Text item is a set of named moves when it says so — by definition
+    /// (`RelativeMovement`) or, with no definition, by name — *and* its allowed
+    /// tokens read as directions. Both are required: a "relMove" with no token
+    /// list gives the app nothing it could send, and a token list of
+    /// directions on an item called "mode" is a coincidence the definition
+    /// should have to confirm.
+    ///
+    /// Tokens are read for the words in them rather than matched exactly, so
+    /// "Up", "TopLeft", "BOTTOM_RIGHT" and "up-left" all land: `top` and `up`
+    /// mean up, `bottom` and `down` mean down, and a token carrying both a
+    /// vertical and a horizontal word is a diagonal.
+    static func namedMoves(named itemName: String, text: SWEText) -> NamedMoves? {
+        let definition = text.definition
+        let name = itemName.lowercased()
+        guard matches(definition, "RelativeMovement", name, ["relmove", "move", "movement", "direction"]),
+              let values = text.constraint?.values, !values.isEmpty else { return nil }
+
+        var tokens: [NamedMoves.Direction: String] = [:]
+        for token in values {
+            guard let direction = direction(of: token), tokens[direction] == nil else { continue }
+            tokens[direction] = token
+        }
+        // At least one real move, or the token list was about something else.
+        guard !tokens.isEmpty else { return nil }
+        return NamedMoves(itemName: itemName, tokens: tokens)
+    }
+
+    private static func direction(of token: String) -> NamedMoves.Direction? {
+        let word = token.lowercased()
+        let up = word.contains("up") || word.contains("top")
+        let down = word.contains("down") || word.contains("bottom")
+        let left = word.contains("left")
+        let right = word.contains("right")
+
+        // A token that says two opposite things is not a direction.
+        guard !(up && down), !(left && right) else { return nil }
+
+        switch (up, down, left, right) {
+        case (true, false, false, false):  return .up
+        case (false, true, false, false):  return .down
+        case (false, false, true, false):  return .left
+        case (false, false, false, true):  return .right
+        case (true, false, true, false):   return .upLeft
+        case (true, false, false, true):   return .upRight
+        case (false, true, true, false):   return .downLeft
+        case (false, true, false, true):   return .downRight
+        default:                           return nil
+        }
     }
 
     // MARK: Structure

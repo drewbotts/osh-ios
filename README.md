@@ -176,7 +176,10 @@ OSHiOS/                     the app's engine — no SwiftUI
 │   │                               every screen
 │   ├── BearingGeometry             geodesic LOB endpoints; BearingStyle
 │   ├── WaterfallBuffer             SDR waterfall pixels, no SwiftUI
+│   ├── Video/VideoCodec            which decoder a Block's compression gets
 │   ├── Video/MJPEGDecoder          JPEG blocks → CGImage, off the main actor
+│   ├── Video/H264Decoder           Annex-B H.264 → CGImage via VideoToolbox,
+│   │                               one per stream
 │   └── ROLES.md                    the inference rules, and how to extend them
 ├── OGC/                    schema *builders* (kept where the port put them)
 │   ├── SWE/                        SWEConstants, GeoPosHelper, VideoCamHelper
@@ -213,7 +216,7 @@ osh-ios/                    the SwiftUI app
     │                       SystemMapView, MarkerView, ClusterMarkerView,
     │                       ActivityDot,
     │                       PTZControlView, HeadingDialView, WaterfallView,
-    │                       MJPEGView
+    │                       VideoFrameView
     ├── Logs/               in-app log tail
     └── Settings/           system name, servers, sensors, rates, behavior
 ```
@@ -234,9 +237,9 @@ and a link to its dashboard; tapping this device's marker follows it.
 
 **Video is the wall.** Every video datastream on the node, two up in portrait
 and three across in landscape, with this device's own camera preview as the
-first tile. At most four MJPEG streams play at once — the fifth pauses the one
-that has been playing longest — and autoplay defaults to WiFi-only, checked
-through `NWPathMonitor`. Tapping a tile opens a full-screen player; if that
+first tile. MJPEG and H.264 both render. At most four streams play at once —
+the fifth pauses the one that has been playing longest — and autoplay defaults
+to WiFi-only, checked through `NWPathMonitor`. Tapping a tile opens a full-screen player; if that
 camera has a recognised PTZ control stream, the D-pad appears over the picture.
 
 **Systems is the list.** Server picker, connectivity, this device's
@@ -391,7 +394,8 @@ redraw the whole map whenever any one system changed colour.
 **SystemLiveSession.** One `ObservationStream` per selected datastream, all of
 them routed through one `TimeSynchronizer` so a video frame and the fix taken at
 the same instant are published together. History rings at 300 per datastream;
-video blocks go to the MJPEG decoder rather than into a ring. It bootstraps from
+video blocks go to a decoder — MJPEG shared, H.264 one per stream — rather than
+into a ring. It bootstraps from
 the archive on start — half an hour for positions and scalar series, a single
 most-recent record for bearings and embedded positions, because a
 direction-finding output emits only on detection and its last LOB may be months
@@ -590,9 +594,15 @@ certificate that validates normally.
   `MaxKeyFrameInterval = 1` so each observation is independently decodable — the
   node stores frames as discrete observations with no GOP context. The cost is a
   much higher bitrate than a normal GOP structure would need.
-- **H.264 video is not decoded.** MJPEG streams render; an H.264 camera shows a
-  placeholder card that reports its arriving frame rate and frame sizes, which
-  proves the stream works without pretending to draw it. Pass 3d.
+- **H.264 needs its parameter sets in-band.** The decoder learns a stream's
+  SPS/PPS from the stream itself — every source seen so far prepends them to
+  each keyframe, as this app's own encoder does — and a camera that sent them
+  once at startup and never again would show nothing to a subscriber joining
+  later. Baseline and Main profile without B-frames are what has been tested;
+  a stream with B-frames would decode but display frames in decode order.
+- **Only JPEG and H.264 are decoded.** Any other codec shows a placeholder card
+  that reports its arriving frame rate and frame sizes, which proves the stream
+  works without pretending to draw it.
 - **Only PTZ cameras can be commanded.** `PTZCapability` recognises pan/tilt/
   zoom control streams and drives them; every other control structure gets its
   parameter tree read-only and says "command support for this structure not yet
@@ -634,8 +644,6 @@ certificate that validates normally.
 
 ## Roadmap
 
-- **H.264 decoding** (Pass 3d), so the node's cameras render rather than
-  reporting their frame rate.
 - **More command structures.** PTZ is recognised and driven; the next ones are
   whatever the schemas on a real deployment turn out to describe. The read side,
   the envelope and the ordered-body discipline are done.

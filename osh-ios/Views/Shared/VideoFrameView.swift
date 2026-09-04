@@ -1,15 +1,16 @@
 import SwiftUI
 
-// MARK: - MJPEGView
+// MARK: - VideoFrameView
 //
 // The picture, plus enough numbers to tell a stalled stream from a slow one.
 //
 // The frame arrives already decoded — SystemLiveSession does that off the main
-// actor — so this is an Image and an overlay. Play and pause open and close the
+// actor, through whichever of MJPEGDecoder and H264Decoder the codec calls for
+// — so this is an Image and an overlay. Play and pause open and close the
 // subscription rather than freezing the display: a paused camera whose socket
 // stayed open would go on costing bandwidth for a still picture.
 
-struct MJPEGView: View {
+struct VideoFrameView: View {
 
     /// Named `latestFrame` rather than `frame` so it cannot be mistaken for
     /// SwiftUI's `frame(...)` modifier at a call site inside `body`.
@@ -116,12 +117,12 @@ struct MJPEGView: View {
 
 // MARK: - UnsupportedCodecView
 
-/// What a stream this pass cannot decode looks like.
+/// What a stream in a codec the app cannot decode looks like.
 ///
-/// Deliberately not an error: an H.264 camera on the node is working perfectly
-/// and the app simply has not learned to draw it yet. Showing the arrival rate
-/// and frame sizes proves that much, and is what makes the difference between
-/// "not implemented" and "broken" visible without opening the Logs tab.
+/// Deliberately not an error: the camera is working and the app simply has no
+/// decoder for what it sends. Showing the arrival rate and frame sizes proves
+/// that much, and is what makes the difference between "not implemented" and
+/// "broken" visible without opening the Logs tab.
 struct UnsupportedCodecView: View {
 
     let compression: String?
@@ -135,7 +136,7 @@ struct UnsupportedCodecView: View {
             HStack(spacing: 8) {
                 Image(systemName: "film.stack")
                     .foregroundStyle(.secondary)
-                Text("\(compression ?? "This codec") preview not yet supported — Pass 3d")
+                Text("\(compression ?? "This codec") preview not supported")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

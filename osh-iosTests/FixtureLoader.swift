@@ -21,10 +21,12 @@ enum FixtureLoader {
         case aisVesselLocation  = "ais-vessel-location"  // Boolean/Category/Text/Vector/nilValues
         case spectrumArray      = "spectrum-array"       // variable-size DataArray via href
         case videoMJPEG         = "video-mjpeg"          // nested DataArray + BinaryBlock
+        case videoH264          = "video-h264"           // Annex-B H.264: IDR with SPS/PPS, then P-frames
         case gps                                          // Time + Vector, as this app writes
         case krakenSettings     = "kraken-settings"      // deeply nested DataRecord
         case krakenDOA          = "kraken-doa"            // direction finding: LOB + confidence
         case choicePTZControl   = "choice-ptz-control"   // DataChoice (control stream)
+        case namedPTZControl    = "named-ptz-control"    // DataChoice of two Text items with tokens
         case lrfTarget          = "lrf-target"           // a designated target point
         case lrfRange           = "lrf-range"            // azimuth with no location vector
     }

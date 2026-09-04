@@ -1,0 +1,44 @@
+{
+  "items": [
+    {
+      "id": "03fdhisrs8s0",
+      "name": "DR-CAMERA - ptzControl",
+      "system@id": "037bvukpipe0",
+      "system@link": {
+        "href": "http://192.168.4.34:8080/sensorhub/api/systems/037bvukpipe0?f=json",
+        "uid": "urn:uuid:c7ea1e95-5b17-4de3-8a9b-0bc5bdf6479f",
+        "type": "application/geo+json"
+      },
+      "inputName": "ptzControl",
+      "validTime": [
+        "2026-09-04T01:48:25.869Z",
+        "now"
+      ],
+      "issueTime": [
+        "2026-09-04T14:10:51.457610693Z",
+        "2026-09-04T14:10:51.457610693Z"
+      ],
+      "executionTime": [
+        "2026-09-04T14:10:53.605682302Z",
+        "2026-09-04T14:10:53.605682302Z"
+      ],
+      "controlledProperties": [
+        {
+          "definition": "http://sensorml.com/ont/swe/property/CameraPresetPositionName",
+          "label": "Preset Camera Position"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/CameraRelativeMovementName",
+          "label": "Camera Relative Movements"
+        }
+      ],
+      "formats": [
+        "application/json",
+        "application/swe+json",
+        "application/swe+csv",
+        "application/swe+xml",
+        "application/swe+binary"
+      ]
+    }
+  ]
+}

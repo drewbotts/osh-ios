@@ -6,9 +6,9 @@ import Combine
 // Every camera on the node, on one screen.
 //
 // The hard part is not the grid — it is that a wall of cameras is the one view
-// that can trivially exhaust a phone. Each MJPEG stream is a WebSocket, a
-// decode per frame and a CGImage held in memory, and a node with nine cameras
-// would try to run nine of them the moment the tab appeared.
+// that can trivially exhaust a phone. Each stream is a WebSocket, a decode per
+// frame and a CGImage held in memory, and a node with nine cameras would try
+// to run nine of them the moment the tab appeared.
 //
 // So there is a hard cap of four playing streams, enforced round-robin: asking
 // for a fifth pauses the one that has been playing longest rather than refusing
@@ -42,7 +42,7 @@ final class VideoWallModel: ObservableObject {
 
     // MARK: Configuration
 
-    /// How many MJPEG streams may play at once.
+    /// How many video streams may play at once.
     static let maxPlaying = 4
 
     /// Systems loaded at once when the tab appears.
@@ -116,7 +116,7 @@ final class VideoWallModel: ObservableObject {
                             datastreamId: datastream.id,
                             datastreamName: datastream.name,
                             compression: compression,
-                            isDecodable: MJPEGDecoder.canDecode(compression: compression))
+                            isDecodable: VideoCodec(compression: compression).isDecodable)
             }
         }
     }
@@ -160,7 +160,7 @@ final class VideoWallModel: ObservableObject {
 
     /// Starts every tile the autoplay setting permits, up to the cap.
     ///
-    /// H.264 tiles are included: they decode to nothing yet, but their arrival
+    /// Tiles in a codec the app cannot draw are included too: their arrival
     /// figures are the only way to tell "not supported" from "not arriving",
     /// and those cost one socket rather than a decode per frame.
     func autoplay() {

@@ -1,0 +1,46 @@
+{
+  "type": "Feature",
+  "id": "037bvukpipe0",
+  "geometry": null,
+  "properties": {
+    "uid": "urn:uuid:c7ea1e95-5b17-4de3-8a9b-0bc5bdf6479f",
+    "featureType": "http://www.w3.org/ns/sosa/Sensor",
+    "name": "DR-CAMERA",
+    "description": "Foscam Network Camera",
+    "validTime": [
+      "2026-09-04T01:48:25.869Z",
+      "now"
+    ]
+  },
+  "links": [
+    {
+      "rel": "canonical",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/037bvukpipe0",
+      "type": "application/json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in SensorML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/037bvukpipe0?f=sml3",
+      "type": "application/sml+json"
+    },
+    {
+      "rel": "alternate",
+      "title": "This system resource in HTML format",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/037bvukpipe0?f=html",
+      "type": "text/html"
+    },
+    {
+      "rel": "datastreams",
+      "title": "List of system datastreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/037bvukpipe0/datastreams?f=json",
+      "type": "application/json"
+    },
+    {
+      "rel": "controlstreams",
+      "title": "List of system controlstreams",
+      "href": "http://192.168.4.34:8080/sensorhub/api/systems/037bvukpipe0/controlstreams?f=json",
+      "type": "application/json"
+    }
+  ]
+}

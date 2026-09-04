@@ -61,15 +61,35 @@ final class PTZController: ObservableObject {
     // MARK: Moves
 
     /// Relative pan. `sign` is −1 for left, +1 for right.
+    ///
+    /// A quantity axis when the camera has one, the named move otherwise: the
+    /// step only means anything to the first, and a camera that takes "Left"
+    /// moves however far its driver decided.
     func pan(_ sign: Double, step: Double) {
-        guard let axis = capability.relativePan else { return }
-        send(item: axis.itemName, value: .number(sign * step))
+        if let axis = capability.relativePan {
+            send(item: axis.itemName, value: .number(sign * step))
+        } else {
+            move(sign < 0 ? .left : .right)
+        }
     }
 
     /// Relative tilt. `sign` is +1 for up, −1 for down.
     func tilt(_ sign: Double, step: Double) {
-        guard let axis = capability.relativeTilt else { return }
-        send(item: axis.itemName, value: .number(sign * step))
+        if let axis = capability.relativeTilt {
+            send(item: axis.itemName, value: .number(sign * step))
+        } else {
+            move(sign > 0 ? .up : .down)
+        }
+    }
+
+    /// A named move, in the camera's own spelling of the direction.
+    ///
+    /// The only route to a diagonal: a quantity camera would need two commands
+    /// for one, and with one in flight at a time the second would be dropped.
+    func move(_ direction: PTZCapability.NamedMoves.Direction) {
+        guard let moves = capability.namedMoves,
+              let token = moves.token(for: direction) else { return }
+        send(item: moves.itemName, value: .text(token))
     }
 
     /// Relative zoom, or an absolute one when only absolute exists.
@@ -224,10 +244,13 @@ struct PTZControlView: View {
                     if capability.supportsDPad { dpad }
                     VStack(spacing: 10) {
                         if capability.relativeZoom != nil { zoomButtons }
-                        if capability.preset != nil { presetField }
+                        if let preset = capability.preset { presetControl(preset) }
                     }
                 }
-                stepPicker
+                // A step size is a number of degrees. A camera that moves by
+                // name has no use for one, and offering it would promise a
+                // precision the next press does not deliver.
+                if capability.supportsQuantityDPad { stepPicker }
                 if capability.supportsAbsolute { absolutePanel }
             }
         }
@@ -274,22 +297,62 @@ struct PTZControlView: View {
 
     // MARK: D-pad
 
+    /// Four arrows, or eight when the camera names its diagonals.
+    ///
+    /// The diagonals fill the corners of the same block rather than adding a
+    /// second control, so a thumb that has learned where "up" is finds
+    /// "up-left" beside it. A quantity camera never gets them: two axes in one
+    /// press would be two commands, and the second would be dropped.
     private var dpad: some View {
-        VStack(spacing: 4) {
-            padButton("chevron.up", "Tilt up") { controller.tilt(1, step: step) }
+        let diagonals = capability.namedMoves?.hasDiagonals == true
+        return VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                cornerSlot(.upLeft, "arrow.up.left", "Tilt up and pan left", shown: diagonals)
+                padButton("chevron.up", "Tilt up") { controller.tilt(1, step: step) }
+                cornerSlot(.upRight, "arrow.up.right", "Tilt up and pan right", shown: diagonals)
+            }
             HStack(spacing: 4) {
                 padButton("chevron.left", "Pan left") { controller.pan(-1, step: step) }
-                Circle()
-                    .fill(.quaternary)
-                    .frame(width: 34, height: 34)
-                    .overlay {
-                        Text(String(format: "%g°", step))
-                            .font(.caption2.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
+                padCentre
                 padButton("chevron.right", "Pan right") { controller.pan(1, step: step) }
             }
-            padButton("chevron.down", "Tilt down") { controller.tilt(-1, step: step) }
+            HStack(spacing: 4) {
+                cornerSlot(.downLeft, "arrow.down.left", "Tilt down and pan left", shown: diagonals)
+                padButton("chevron.down", "Tilt down") { controller.tilt(-1, step: step) }
+                cornerSlot(.downRight, "arrow.down.right", "Tilt down and pan right", shown: diagonals)
+            }
+        }
+    }
+
+    /// The step, when a step means something; otherwise just the hub of the pad.
+    private var padCentre: some View {
+        Circle()
+            .fill(.quaternary)
+            .frame(width: 34, height: 34)
+            .overlay {
+                if capability.supportsQuantityDPad {
+                    Text(String(format: "%g°", step))
+                        .font(.caption2.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Image(systemName: "dot.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+    }
+
+    /// A diagonal button, or the empty space one would occupy — the empty
+    /// space is what keeps the four arrows in a cross rather than a column.
+    @ViewBuilder
+    private func cornerSlot(_ direction: PTZCapability.NamedMoves.Direction,
+                            _ symbol: String,
+                            _ label: String,
+                            shown: Bool) -> some View {
+        if shown, capability.namedMoves?.token(for: direction) != nil {
+            padButton(symbol, label) { controller.move(direction) }
+        } else {
+            Color.clear.frame(width: 44, height: 34)
         }
     }
 
@@ -332,9 +395,34 @@ struct PTZControlView: View {
 
     // MARK: Preset
 
-    /// A field rather than a menu: the schema declares a Text with no
-    /// AllowedTokens, so the app genuinely does not know what presets exist and
-    /// an empty menu would be a worse lie than an empty field.
+    /// A menu when the schema lists the presets, a field when it does not.
+    ///
+    /// The Axis camera declares a Text with no AllowedTokens, so the app
+    /// genuinely does not know what presets exist and an empty menu would be a
+    /// worse lie than an empty field. A camera that does list them gets a menu,
+    /// because typing "BottomMost" exactly is not something to ask of a thumb.
+    @ViewBuilder
+    private func presetControl(_ preset: PTZCapability.Axis) -> some View {
+        if let tokens = preset.tokens, !tokens.isEmpty {
+            Menu {
+                ForEach(tokens, id: \.self) { token in
+                    Button(token) {
+                        onInteraction()
+                        controller.goToPreset(token)
+                    }
+                }
+            } label: {
+                Label("Preset", systemImage: "list.bullet")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 110, height: 34)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .accessibilityLabel("Preset positions")
+        } else {
+            presetField
+        }
+    }
+
     private var presetField: some View {
         HStack(spacing: 4) {
             TextField("Preset", text: $presetName)

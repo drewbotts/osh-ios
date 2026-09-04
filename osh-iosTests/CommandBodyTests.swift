@@ -38,6 +38,14 @@ struct CommandBodyTests {
                 == #"{"parameters":{"preset":"Home"}}"#)
     }
 
+    /// Verified against the reference node's second camera on 2026-09-04:
+    /// this body answered 200 with `"statusCode": "COMPLETED"`.
+    @Test("A named move is a text item carrying the camera's own token")
+    func namedMoveChoiceItem() {
+        #expect(CommandBody.choice(item: "relMove", value: .text("Left"))
+                == #"{"parameters":{"relMove":"Left"}}"#)
+    }
+
     @Test("A preset name with a quote in it is escaped, not broken")
     func textEscaping() {
         #expect(CommandBody.parameters(item: "preset", value: .text("Gate \"A\"\n"))

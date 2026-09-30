@@ -1,0 +1,184 @@
+{
+  "items": [
+    {
+      "id": "02odh77sm02g",
+      "name": "Axis PTZ - Sensor Orientation",
+      "system@id": "02luf9f2mgag",
+      "system@link": {
+        "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=json",
+        "uid": "urn:axis:cam:E82725115276",
+        "type": "application/geo+json"
+      },
+      "outputName": "sensorOrientationPtz",
+      "validTime": [
+        "2026-08-27T01:19:49.197Z",
+        "now"
+      ],
+      "phenomenonTime": [
+        "2026-09-15T17:32:08.628Z",
+        "2026-09-15T17:32:08.628Z"
+      ],
+      "observedProperties": [
+        {
+          "definition": "http://www.opengis.net/def/property/OGC/0/SensorOrientation",
+          "description": "Euler angles with order of rotation heading/pitch/roll in rotating frame"
+        }
+      ],
+      "resultType": "vector",
+      "formats": [
+        "application/om+json",
+        "application/swe+json",
+        "application/swe+csv",
+        "application/swe+xml",
+        "application/swe+binary"
+      ]
+    },
+    {
+      "id": "02jr71ulsgig",
+      "name": "Axis PTZ - Video",
+      "system@id": "02luf9f2mgag",
+      "system@link": {
+        "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=json",
+        "uid": "urn:axis:cam:E82725115276",
+        "type": "application/geo+json"
+      },
+      "outputName": "video1",
+      "validTime": [
+        "2026-08-27T01:19:49.197Z",
+        "now"
+      ],
+      "phenomenonTime": [
+        "2026-09-15T17:32:08.689Z",
+        "2026-09-15T17:32:08.689Z"
+      ],
+      "observedProperties": [
+        {
+          "definition": "http://sensorml.com/ont/swe/property/RasterImage"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/RedChannel"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/GreenChannel"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/BlueChannel"
+        }
+      ],
+      "resultType": "coverage",
+      "formats": [
+        "application/om+json",
+        "application/swe+binary"
+      ]
+    },
+    {
+      "id": "02do9hkemgv0",
+      "name": "Axis PTZ - Sensor Location",
+      "system@id": "02luf9f2mgag",
+      "system@link": {
+        "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=json",
+        "uid": "urn:axis:cam:E82725115276",
+        "type": "application/geo+json"
+      },
+      "outputName": "sensorLocation",
+      "validTime": [
+        "2026-08-27T01:19:49.197Z",
+        "now"
+      ],
+      "phenomenonTime": [
+        "2026-09-15T13:18:39.483Z",
+        "2026-09-15T13:18:39.483Z"
+      ],
+      "observedProperties": [
+        {
+          "definition": "http://www.opengis.net/def/property/OGC/0/SensorLocation"
+        }
+      ],
+      "resultType": "vector",
+      "formats": [
+        "application/om+json",
+        "application/swe+json",
+        "application/swe+csv",
+        "application/swe+xml",
+        "application/swe+binary"
+      ]
+    },
+    {
+      "id": "03me1lmol9i0",
+      "name": "Axis PTZ - Platform Orientation",
+      "system@id": "02luf9f2mgag",
+      "system@link": {
+        "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=json",
+        "uid": "urn:axis:cam:E82725115276",
+        "type": "application/geo+json"
+      },
+      "outputName": "sensorOrientation",
+      "validTime": [
+        "2026-08-27T01:19:49.197Z",
+        "now"
+      ],
+      "phenomenonTime": [
+        "2026-09-15T13:18:39.488Z",
+        "2026-09-15T13:18:39.488Z"
+      ],
+      "observedProperties": [
+        {
+          "definition": "http://www.opengis.net/def/property/OGC/0/SensorOrientation",
+          "description": "Euler angles with order of rotation heading/pitch/roll in rotating frame"
+        }
+      ],
+      "resultType": "vector",
+      "formats": [
+        "application/om+json",
+        "application/swe+json",
+        "application/swe+csv",
+        "application/swe+xml",
+        "application/swe+binary"
+      ]
+    },
+    {
+      "id": "02sfpq7ju5ng",
+      "name": "Axis PTZ - ptzOutput",
+      "system@id": "02luf9f2mgag",
+      "system@link": {
+        "href": "http://192.168.4.34:8080/sensorhub/api/systems/02luf9f2mgag?f=json",
+        "uid": "urn:axis:cam:E82725115276",
+        "type": "application/geo+json"
+      },
+      "outputName": "ptzOutput",
+      "validTime": [
+        "2026-08-27T01:19:49.197Z",
+        "now"
+      ],
+      "phenomenonTime": [
+        "2026-09-15T17:32:08.628Z",
+        "2026-09-15T17:32:08.628Z"
+      ],
+      "observedProperties": [
+        {
+          "definition": "http://sensorml.com/ont/swe/property/Pan",
+          "label": "Pan",
+          "description": "Gimbal rotation (usually horizontal)"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/Tilt",
+          "label": "Tilt",
+          "description": "Gimbal rotation (usually up-down)"
+        },
+        {
+          "definition": "http://sensorml.com/ont/swe/property/ZoomFactor",
+          "label": "Zoom Factor",
+          "description": "Camera specific zoom factor"
+        }
+      ],
+      "resultType": "record",
+      "formats": [
+        "application/om+json",
+        "application/swe+json",
+        "application/swe+csv",
+        "application/swe+xml",
+        "application/swe+binary"
+      ]
+    }
+  ]
+}

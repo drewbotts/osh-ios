@@ -14,6 +14,7 @@ import Foundation
 //   POST /systems                        → register a system, returns system id
 //   POST /systems/{id}/datastreams       → register a datastream, returns datastream id
 //   POST /datastreams/{id}/observations  → post an observation
+//   PUT  /systems/{id}                    → replace a system's SensorML description
 
 actor ConnectedSystemsClient {
 
@@ -108,6 +109,135 @@ actor ConnectedSystemsClient {
             throw ClientError.missingLocation("POST /systems/\(systemId)/datastreams returned no Location header")
         }
         return id
+    }
+
+    // MARK: - Datastream creation with a receipt
+    //
+    // registerDatastream above throws on any non-2xx and is what the publisher
+    // needs. Survey-in creates outputs on a system it does not own, and a
+    // refusal there is the thing the user has to see — so this variant returns
+    // the node's answer whatever the status. Same body builder, same endpoint.
+
+    func createDatastream(systemId: String,
+                          name: String,
+                          schema: DataRecord,
+                          encoding: BinaryEncoding) async throws
+        -> (receipt: WriteReceipt, id: String?, request: String) {
+
+        let url = baseURL
+            .appendingPathComponent("systems")
+            .appendingPathComponent(systemId)
+            .appendingPathComponent("datastreams")
+        let json = buildDatastreamJSON(name: name, schema: schema, encoding: encoding)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = Data(json.utf8)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let authHeader { request.setValue(authHeader, forHTTPHeaderField: "Authorization") }
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw ClientError.invalidResponse }
+
+        let receipt = WriteReceipt(statusCode: http.statusCode, body: data)
+        let id = http.value(forHTTPHeaderField: "Location").flatMap { URL(string: $0)?.lastPathComponent }
+        if receipt.isSuccess {
+            Log.api.info("POST \(url.path, privacy: .public) → HTTP \(http.statusCode) id \(id ?? "-", privacy: .public)")
+        } else {
+            let location = http.value(forHTTPHeaderField: "Location") ?? "none"
+            Log.api.error("POST \(url.path, privacy: .public) → HTTP \(http.statusCode) location=\(location, privacy: .public) body=\(receipt.bodyText, privacy: .public)")
+        }
+        return (receipt, id, json)
+    }
+
+    // MARK: - System description update
+    //
+    // PUT /systems/{systemId} with a SensorML-JSON body — the whole description,
+    // which the caller obtained from GET and edited in place. Survey-in is the
+    // one user of this: it writes a position into a system that has no GPS of
+    // its own. See SensorMLPositionPatch for the document and SURVEY_IN.md for
+    // the verified exchange.
+
+    /// What the node said to a PUT. Returned for *any* HTTP status, because a
+    /// rejected description is the interesting case: the node's 400 body names
+    /// the offending path, and that text is how the user learns what happened.
+    /// Only a transport failure throws.
+    struct WriteReceipt: Sendable {
+        let statusCode: Int
+        let body: Data
+
+        var isSuccess: Bool { (200...299).contains(statusCode) }
+        var isUnauthorized: Bool { statusCode == 401 || statusCode == 403 }
+
+        var bodyText: String {
+            String(data: body.prefix(4096), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "<\(body.count) bytes>"
+        }
+
+        /// The node's own error text, when the body is its usual JSON report.
+        var message: String? {
+            guard let root = try? JSONSerialization.jsonObject(with: body) as? [String: Any]
+            else { return nil }
+            return root["message"] as? String
+        }
+    }
+
+    func putSystemDescription(systemId: String, body: Data) async throws -> WriteReceipt {
+        let url = baseURL.appendingPathComponent("systems").appendingPathComponent(systemId)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.httpBody = body
+        request.setValue("application/sml+json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let authHeader { request.setValue(authHeader, forHTTPHeaderField: "Authorization") }
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw ClientError.invalidResponse }
+
+        let receipt = WriteReceipt(statusCode: http.statusCode, body: data)
+        if receipt.isSuccess {
+            Log.api.info("PUT \(url.path, privacy: .public) → HTTP \(http.statusCode) (\(body.count) bytes)")
+        } else {
+            let location = http.value(forHTTPHeaderField: "Location") ?? "none"
+            Log.api.error("PUT \(url.path, privacy: .public) → HTTP \(http.statusCode) location=\(location, privacy: .public) body=\(receipt.bodyText, privacy: .public)")
+        }
+        return receipt
+    }
+
+    // MARK: - Post a prebuilt observation
+    //
+    // Survey-in writes to a *driver's* static outputs — a schema this app did
+    // not register and whose body it builds itself (SurveyObservationBody). It
+    // needs the node's answer whatever the status, because a refused write is
+    // the thing the user has to see. postObservation above is the publisher's
+    // and is left exactly as it is.
+
+    func postObservationBody(datastreamId: String, body: Data) async throws -> WriteReceipt {
+        let url = baseURL
+            .appendingPathComponent("datastreams")
+            .appendingPathComponent(datastreamId)
+            .appendingPathComponent("observations")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.setValue("application/swe+json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let authHeader { request.setValue(authHeader, forHTTPHeaderField: "Authorization") }
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw ClientError.invalidResponse }
+
+        let receipt = WriteReceipt(statusCode: http.statusCode, body: data)
+        if receipt.isSuccess {
+            Log.api.info("POST \(url.path, privacy: .public) → HTTP \(http.statusCode) (\(body.count) bytes)")
+        } else {
+            let location = http.value(forHTTPHeaderField: "Location") ?? "none"
+            Log.api.error("POST \(url.path, privacy: .public) → HTTP \(http.statusCode) location=\(location, privacy: .public) body=\(receipt.bodyText, privacy: .public)")
+        }
+        return receipt
     }
 
     // MARK: - Post observation

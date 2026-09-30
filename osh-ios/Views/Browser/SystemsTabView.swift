@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // MARK: - SystemsTabView
 //
@@ -29,6 +30,7 @@ struct SystemsTabView: View {
     @State private var search = ""
     @State private var filter: SystemFilter = .all
     @State private var showResetAlert = false
+    @State private var surveyTarget: RemoteSystem?
 
     var body: some View {
         NavigationStack {
@@ -45,6 +47,11 @@ struct SystemsTabView: View {
             .refreshable { await model.load(connection: connections.active, refresh: true) }
             .task(id: connections.active?.server.id) {
                 await model.load(connection: connections.active)
+            }
+            .fullScreenCover(item: $surveyTarget) { system in
+                if let connection = connections.active {
+                    SurveyInView(system: system, connection: connection)
+                }
             }
             .alert("Reset cached registration?", isPresented: $showResetAlert) {
                 Button("Reset", role: .destructive, action: resetRegistration)
@@ -209,6 +216,13 @@ struct SystemsTabView: View {
                                             peers: model.systems)
                     } label: {
                         SystemRow(system: system, activity: model.activity(for: system))
+                    }
+                    .contextMenu {
+                        Button {
+                            surveyTarget = system
+                        } label: {
+                            Label("Survey-In Position…", systemImage: "scope")
+                        }
                     }
                 }
             }
@@ -469,9 +483,11 @@ final class SystemsModel: ObservableObject {
 
     private let loader = RemoteSystemLoader()
     private var connection: NodeConnection?
+    private var changeObserver: AnyCancellable?
 
     func load(connection: NodeConnection?, refresh: Bool = false) async {
         self.connection = connection
+        observeChanges()
         guard let connection else {
             systems = []
             error = "Select a server to browse its systems."
@@ -504,5 +520,34 @@ final class SystemsModel: ObservableObject {
     func activity(for system: RemoteSystem) -> SystemActivity {
         guard let serverId = connection?.server.id else { return system.activity }
         return ActivityTracker.shared.activity(serverId: serverId, systemId: system.id)
+    }
+
+    // MARK: Changes
+
+    /// Reloads one system when something on this device rewrote it — a
+    /// survey-in, today — so its row does not keep an old position for the
+    /// rest of the cache's five minutes.
+    private func observeChanges() {
+        guard changeObserver == nil else { return }
+        changeObserver = SystemChangeFeed.shared.$lastChange
+            .compactMap { $0 }
+            .sink { [weak self] change in
+                guard let self else { return }
+                Task { await self.reload(change) }
+            }
+    }
+
+    private func reload(_ change: SystemChangeFeed.Change) async {
+        guard let connection, connection.server.id == change.serverId else { return }
+        let outcome = await loader.load(systemId: change.systemId,
+                                        using: connection.readClient,
+                                        serverId: connection.server.id,
+                                        refresh: true)
+        guard case .success(let system) = outcome else { return }
+        if let index = systems.firstIndex(where: { $0.id == system.id }) {
+            systems[index] = system
+        } else {
+            systems.append(system)
+        }
     }
 }

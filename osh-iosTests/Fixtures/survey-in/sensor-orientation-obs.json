@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "id": "03me1lmol9ic9gv3ine3jbsbknagc78m9800",
+      "datastream@id": "03me1lmol9i0",
+      "foi@id": "032c7oslrgsg",
+      "phenomenonTime": "2026-09-15T13:18:39.488Z",
+      "resultTime": "2026-09-15T13:18:39.488Z",
+      "result": {
+        "orientation": {"heading": 0.0,"pitch": 0.0,"roll": 0.0}
+      }
+    }
+  ]
+}

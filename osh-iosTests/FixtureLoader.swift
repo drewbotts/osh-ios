@@ -29,6 +29,7 @@ enum FixtureLoader {
         case namedPTZControl    = "named-ptz-control"    // DataChoice of two Text items with tokens
         case lrfTarget          = "lrf-target"           // a designated target point
         case lrfRange           = "lrf-range"            // azimuth with no location vector
+        case surveyIn           = "survey-in"            // SensorML system descriptions, with and without a GeoPose position
     }
 
     /// The fixture tree: the copy inside the test bundle when there is one,

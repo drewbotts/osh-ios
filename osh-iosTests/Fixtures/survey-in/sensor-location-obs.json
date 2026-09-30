@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "id": "02do9hkemgvc9gv3ine3jbsbknagc769vr00",
+      "datastream@id": "02do9hkemgv0",
+      "foi@id": "032c7oslrgsg",
+      "phenomenonTime": "2026-09-15T13:18:39.483Z",
+      "resultTime": "2026-09-15T13:18:39.483Z",
+      "result": {
+        "location": {"lat": 34.99950637619338,"lon": -85.32749112287203,"alt": 0.0}
+      }
+    }
+  ]
+}

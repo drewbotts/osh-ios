@@ -40,6 +40,8 @@ unmodified.
 | `source-subsystems.json` | that second system's subsystems, empty or not |
 | `controlstreams.json` | `GET /systems/{id}/controlstreams` |
 | `control-schema.json` | `GET /controlstreams/{id}/schema?commandFormat=…` |
+| `system-sml.json`, `system-*-sml.json` | `GET /systems/{id}?f=sml3` — the SensorML description (survey-in only) |
+| `sensor-*-schema.json`, `sensor-*-obs.json` | the Axis PTZ's static `sensorLocation` / `sensorOrientation` outputs and the live `sensorOrientationPtz` schema (survey-in only) |
 
 A file is **absent when the node did not serve it**, and that absence is itself
 under test — `video-mjpeg` has no `schema-json.json` because the node answers
@@ -67,6 +69,7 @@ successive `limit=N` responses because the datastream is archive-only.
 | `named-ptz-control` | DR-CAMERA ptzControl | a DataChoice of two Text items with AllowedTokens — presets by name, relative moves by direction name |
 | `lrf-target` | TruPulse 360 targetLoc | a location vector that is *not* the system's position — the shape the `.target` role exists for |
 | `lrf-range` | TruPulse 360 rangeData | an azimuth and two distances with no location vector: must stay a `.bearing` |
+| `survey-in` | Axis PTZ, DR-CAMERA, iPhone | SensorML descriptions for the read-modify-write of a `position`: one with the node's own GeoPose (NED, angles 0), one with parameters and no position, one with `localReferenceFrames` and no position, plus the Axis as GeoJSON — what the node serves when `f=` is missing. Captured by hand with `curl … ?f=sml3` on 2026-09-15; `capture-fixtures.sh` does not fetch SensorML |
 
 ## Not represented on this node
 
@@ -84,10 +87,12 @@ successive `limit=N` responses because the datastream is archive-only.
 - **A DataChoice with messages.** The PTZ control stream has zero archived
   commands, so the binary choice-selector layout could not be verified against
   real bytes. See `OSHiOS/SWE/Decode/BINARY_FORMAT.md`.
-- **A system with a geometry.** Not one of the node's systems carries a point in
-  its registration or its sampling features, so `PositionKind.deployed` — the
-  static "installed here" marker — has no fixture behind it and is covered by
-  the synthetic cases in `RemoteSystemTests`.
+- **A system with a geometry — no longer true.** Since the datastream fixtures
+  were captured, both Axis cameras have been given a position through their
+  driver configuration; `survey-in/system.json` is the Axis PTZ *with* a
+  geometry. The older `choice-ptz-control/system.json` still shows it with
+  `"geometry": null`, and `PositionKind.deployed` keeps its synthetic cases in
+  `RemoteSystemTests`.
 - **Matrix, Geometry, the Range types, and the unsigned and short integer
   dataTypes.** The decoder handles them; no fixture exercises them, and the
   synthetic tests in `SWEBinaryFormatTests` cover them instead.

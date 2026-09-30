@@ -30,6 +30,7 @@ struct SystemDashboardView: View {
     @StateObject private var session: SystemLiveSession
 
     @State private var expandedMapDatastream: RemoteDatastream?
+    @State private var showsSurveyIn = false
 
     init(system: RemoteSystem, connection: NodeConnection, peers: [RemoteSystem] = []) {
         self.system = system
@@ -72,6 +73,11 @@ struct SystemDashboardView: View {
         .sheet(item: $expandedMapDatastream) { datastream in
             ExpandedMapSheet(datastream: datastream, session: session)
         }
+        // Full screen rather than a sheet: the compass wants the whole
+        // display, and a survey is not something to swipe away by accident.
+        .fullScreenCover(isPresented: $showsSurveyIn) {
+            SurveyInView(system: system, connection: connection)
+        }
     }
 
     /// Status first, then bearing, then everything else in viewing order.
@@ -103,6 +109,20 @@ struct SystemDashboardView: View {
             Button(session.isRunning ? "Stop all" : "Start",
                    systemImage: session.isRunning ? "stop.fill" : "play.fill") {
                 session.isRunning ? session.stop() : session.start()
+            }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                // Offered for every system, not only the ones with no position:
+                // a camera whose driver was configured with 0, 0 has a position
+                // and is exactly the thing a survey exists to fix.
+                Button {
+                    showsSurveyIn = true
+                } label: {
+                    Label("Survey-In Position…", systemImage: "scope")
+                }
+            } label: {
+                Label("More", systemImage: "ellipsis.circle")
             }
         }
     }

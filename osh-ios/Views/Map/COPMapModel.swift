@@ -104,6 +104,7 @@ final class COPMapModel: ObservableObject {
 
     private let loader = RemoteSystemLoader()
     private var activityObserver: AnyCancellable?
+    private var changeObserver: AnyCancellable?
     private var sessions: [String: SystemLiveSession] = [:]
     private var sessionObservers: [String: AnyCancellable] = [:]
     /// systemId → datastreamId → the one archived observation, for static mode.
@@ -143,6 +144,7 @@ final class COPMapModel: ObservableObject {
         if refresh { await loader.invalidate(serverId: connection.server.id) }
 
         observeActivity()
+        observeChanges()
 
         do {
             let summaries = try await connection.readClient.listSystems(limit: 200)
@@ -184,6 +186,42 @@ final class COPMapModel: ObservableObject {
         guard activityObserver == nil else { return }
         activityObserver = ActivityTracker.shared.objectWillChange
             .sink { [weak self] _ in self?.scheduleRefresh() }
+    }
+
+    /// Reloads one system when something on this device rewrote its
+    /// description — a survey-in — and redraws. The marker for a system with
+    /// only a deployed position comes from that description, so without this
+    /// the map would show the old pin until the cache expired.
+    private func observeChanges() {
+        guard changeObserver == nil else { return }
+        changeObserver = SystemChangeFeed.shared.$lastChange
+            .compactMap { $0 }
+            .sink { [weak self] change in
+                guard let self else { return }
+                Task { await self.reload(change) }
+            }
+    }
+
+    private func reload(_ change: SystemChangeFeed.Change) async {
+        guard let connection, connection.server.id == change.serverId else { return }
+        let outcome = await loader.load(systemId: change.systemId,
+                                        using: connection.readClient,
+                                        serverId: connection.server.id,
+                                        refresh: true)
+        guard case .success(let system) = outcome else { return }
+        if let index = systems.firstIndex(where: { $0.id == system.id }) {
+            systems[index] = system
+        } else {
+            systems.append(system)
+        }
+        // A system drawn from its archive keeps the last observation fetched
+        // for it; drop that so the re-fetch below picks up what was just
+        // written, otherwise the marker sits on the old fix until reload.
+        archived[system.id] = nil
+        if sessions[system.id] == nil {
+            await fetchArchivedPositions(connection: connection, only: system.id)
+        }
+        refreshAnnotations()
     }
 
     private func captureActivity(serverId: UUID) {
@@ -314,10 +352,12 @@ final class COPMapModel: ObservableObject {
     /// One archived observation per position-bearing datastream, for systems
     /// with no live session.
     private func fetchArchivedPositions(connection: NodeConnection,
-                                        excluding live: Set<String> = []) async {
+                                        excluding live: Set<String> = [],
+                                        only systemId: String? = nil) async {
         let client = connection.readClient
 
-        for system in systems where !live.contains(system.id) {
+        for system in systems where !live.contains(system.id)
+            && (systemId == nil || system.id == systemId) {
             let relevant = system.datastreams.filter {
                 $0.decoder != nil && Self.drawsOnMap($0)
             }

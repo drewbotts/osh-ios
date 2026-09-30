@@ -1,0 +1,54 @@
+{
+  "type": "PhysicalSystem",
+  "id": "037bvukpipe0",
+  "uniqueId": "urn:uuid:c7ea1e95-5b17-4de3-8a9b-0bc5bdf6479f",
+  "definition": "http://www.w3.org/ns/sosa/Sensor",
+  "label": "DR-CAMERA",
+  "description": "Foscam Network Camera",
+  "validTime": [
+    "2026-09-04T01:48:25.869Z",
+    "now"
+  ],
+  "parameters": [
+    {
+      "type": "DataChoice",
+      "name": "ptzControl",
+      "updatable": true,
+      "items": [
+        {
+          "type": "Text",
+          "name": "preset",
+          "definition": "http://sensorml.com/ont/swe/property/CameraPresetPositionName",
+          "label": "Preset Camera Position",
+          "constraint": {
+            "values": [
+              "Reset",
+              "TopMost",
+              "BottomMost",
+              "LeftMost",
+              "RightMost"
+            ]
+          }
+        },
+        {
+          "type": "Text",
+          "name": "relMove",
+          "definition": "http://sensorml.com/ont/swe/property/CameraRelativeMovementName",
+          "label": "Camera Relative Movements",
+          "constraint": {
+            "values": [
+              "Up",
+              "Down",
+              "Left",
+              "Right",
+              "TopLeft",
+              "TopRight",
+              "BottomLeft",
+              "BottomRight"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

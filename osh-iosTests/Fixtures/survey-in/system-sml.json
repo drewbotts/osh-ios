@@ -1,0 +1,194 @@
+{
+  "type": "PhysicalSystem",
+  "id": "02luf9f2mgag",
+  "uniqueId": "urn:axis:cam:E82725115276",
+  "definition": "http://www.w3.org/ns/sosa/Sensor",
+  "label": "Axis PTZ",
+  "description": "Axis Video Camera",
+  "identifiers": [
+    {
+      "definition": "http://sensorml.com/ont/swe/property/Manufacturer",
+      "label": "Manufacturer Name",
+      "value": "Axis"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/ModelNumber",
+      "label": "Model Number",
+      "value": "M5526-E"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/SerialNumber",
+      "label": "Serial Number",
+      "value": "E82725115276"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/LongName",
+      "label": "Long Name",
+      "value": "AXIS M5526-E PTZ Camera"
+    },
+    {
+      "definition": "http://sensorml.com/ont/swe/property/ShortName",
+      "label": "Short Name",
+      "value": "AXIS M5526-E"
+    }
+  ],
+  "validTime": [
+    "2026-08-27T01:19:49.197Z",
+    "now"
+  ],
+  "position": {
+    "type": "GeoPose",
+    "ltpReferenceFrame": "http://www.opengis.net/def/cs/OGC/0/NED",
+    "position": {
+      "lat": 34.99950637619338,
+      "lon": -85.32749112287203,
+      "h": 0.0
+    },
+    "angles": {
+      "yaw": 0.0,
+      "pitch": 0.0,
+      "roll": 0.0
+    }
+  },
+  "parameters": [
+    {
+      "type": "DataChoice",
+      "name": "ptzControl",
+      "updatable": true,
+      "items": [
+        {
+          "type": "Quantity",
+          "name": "pan",
+          "definition": "http://sensorml.com/ont/swe/property/Pan",
+          "label": "Pan",
+          "description": "Gimbal rotation (usually horizontal)",
+          "uom": {
+            "code": "deg"
+          },
+          "constraint": {
+            "intervals": [
+              [-180.0,180.0]
+            ]
+          }
+        },
+        {
+          "type": "Quantity",
+          "name": "tilt",
+          "definition": "http://sensorml.com/ont/swe/property/Tilt",
+          "label": "Tilt",
+          "description": "Gimbal rotation (usually up-down)",
+          "uom": {
+            "code": "deg"
+          },
+          "constraint": {
+            "intervals": [
+              [-90.0,0.0]
+            ]
+          }
+        },
+        {
+          "type": "Quantity",
+          "name": "zoom",
+          "definition": "http://sensorml.com/ont/swe/property/ZoomFactor",
+          "label": "Zoom Factor",
+          "description": "Camera specific zoom factor",
+          "uom": {
+            "code": "1"
+          },
+          "constraint": {
+            "intervals": [
+              [1.0,9999.0]
+            ]
+          }
+        },
+        {
+          "type": "Quantity",
+          "name": "rpan",
+          "definition": "http://sensorml.com/ont/swe/property/RelativePan",
+          "label": "Relative Pan",
+          "uom": {
+            "code": "deg"
+          }
+        },
+        {
+          "type": "Quantity",
+          "name": "rtilt",
+          "definition": "http://sensorml.com/ont/swe/property/RelativeTilt",
+          "label": "Relative Tilt",
+          "uom": {
+            "code": "deg"
+          }
+        },
+        {
+          "type": "Quantity",
+          "name": "rzoom",
+          "definition": "http://sensorml.com/ont/swe/property/RelativeZoomFactor",
+          "label": "Relative Zoom Factor",
+          "uom": {
+            "code": "1"
+          }
+        },
+        {
+          "type": "Text",
+          "name": "preset",
+          "definition": "http://sensorml.com/ont/swe/property/CameraPresetPositionName",
+          "label": "Preset Camera Position",
+          "constraint": {}
+        },
+        {
+          "type": "DataRecord",
+          "name": "ptzPos",
+          "definition": "http://sensorml.com/ont/swe/property/PtzPosition",
+          "label": "Absolute PTZ Position",
+          "fields": [
+            {
+              "type": "Quantity",
+              "name": "pan",
+              "definition": "http://sensorml.com/ont/swe/property/Pan",
+              "label": "Pan",
+              "description": "Gimbal rotation (usually horizontal)",
+              "uom": {
+                "code": "deg"
+              },
+              "constraint": {
+                "intervals": [
+                  [-180.0,180.0]
+                ]
+              }
+            },
+            {
+              "type": "Quantity",
+              "name": "tilt",
+              "definition": "http://sensorml.com/ont/swe/property/Tilt",
+              "label": "Tilt",
+              "description": "Gimbal rotation (usually up-down)",
+              "uom": {
+                "code": "deg"
+              },
+              "constraint": {
+                "intervals": [
+                  [-90.0,0.0]
+                ]
+              }
+            },
+            {
+              "type": "Quantity",
+              "name": "zoom",
+              "definition": "http://sensorml.com/ont/swe/property/ZoomFactor",
+              "label": "Zoom Factor",
+              "description": "Camera specific zoom factor",
+              "uom": {
+                "code": "1"
+              },
+              "constraint": {
+                "intervals": [
+                  [1.0,9999.0]
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

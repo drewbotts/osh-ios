@@ -1,0 +1,40 @@
+{
+  "type": "PhysicalSystem",
+  "id": "0410",
+  "uniqueId": "urn:osh:ios:919993cb-a0ce-4938-b869-eefcf8235f3b",
+  "label": "iPhone",
+  "identifiers": [
+    {
+      "label": "Short Name",
+      "value": "iPhone"
+    },
+    {
+      "label": "Unique ID",
+      "value": "urn:osh:ios:919993cb-a0ce-4938-b869-eefcf8235f3b"
+    }
+  ],
+  "validTime": [
+    "2026-08-28T13:55:18.810901146Z",
+    "now"
+  ],
+  "localReferenceFrames": [
+    {
+      "id": "LOCAL_FRAME",
+      "origin": "Center of the device screen",
+      "axes": [
+        {
+          "name": "x",
+          "description": "The X axis is in the plane of the screen and points to the right"
+        },
+        {
+          "name": "y",
+          "description": "The Y axis is in the plane of the screen and points up"
+        },
+        {
+          "name": "z",
+          "description": "The Z axis points towards the outside of the front face of the screen"
+        }
+      ]
+    }
+  ]
+}

@@ -9,6 +9,67 @@ than by release, because the app has not shipped a versioned build yet.
 
 ### Added
 
+**Survey-In Position** (`OSHiOS/Survey/`, `osh-ios/Views/Survey/`). A system
+with no GPS of its own — the Axis PTZ on the Pi node — can be positioned by
+standing at it with the phone. From a system's dashboard (the ⋯ menu) or a
+long-press on its row in Systems, the alignment screen shows a full-size
+compass with the phone's true heading and an accuracy wedge, the live fix with
+both altitudes labelled — **HAE (written)** and **MSL (reference)**, because
+EPSG 4979 wants ellipsoid height and every GPS app shows sea level — plus
+CoreLocation's heading accuracy and the magnetometer's calibration, warning
+when either is poor. Capture averages five seconds: fixes weighted by 1/σ²,
+headings by circular mean (`SurveyMath`, so 359° and 1° average to north, not
+south). The review screen offers a ±30° heading adjustment at 0.5°, an
+editable HAE, and mount pitch/roll (zero by default, the phone's own one tap
+away); nothing is sent until "Write". For a PTZ camera the screen says the
+orientation must describe the pan-zero axis and offers **Send PTZ Home**,
+planned from the same `PTZCapability` as the D-pad (`PTZHomePlan`: the Axis
+gets `ptzPos` pan 0 / tilt 0 / zoom 1, the DR-CAMERA its `Reset` preset).
+
+The write is a read-modify-write of the system's **SensorML description**, not
+an observation: `GET /systems/{id}?f=application/sml+json`, replace or insert
+the `position` member, `PUT /systems/{id}` as `application/sml+json`, re-read
+and compare. The element is the node's own shape — a `GeoPose` with `type`
+first, `position` `{lat, lon, h}` and `angles` `{yaw, pitch, roll}` in a
+**NED** tangent frame so yaw is a compass heading, `referenceFrame` EPSG 4979
+so `h` is HAE — taken from the Axis PTZ's description on the reference node and
+from the node's own `SMLJsonBindings`/`GeoPoseJsonBindings`. Every other
+member of the document goes back byte-for-byte and in order, via a small
+order-preserving JSON model (`OrderedJSON`) — the node's Gson reader needs
+`type` first in every object and a Dictionary would have shuffled it. The
+`f=` query is required: the node ignores `Accept: application/sml+json` alone
+and answers GeoJSON. `SystemChangeFeed` tells the Systems list and the map to
+reload one system after a write, so the new pin appears without waiting out
+the five-minute cache.
+
+**Two write paths, both through datastreams** (`SurveyWriteStrategy`). A
+system whose driver publishes its configured emplacement as `sensorLocation` /
+`sensorOrientation` outputs — the Axis cameras — gets one swe+json observation
+posted to each, built from the stream's own schema (`SurveyObservationBody`;
+the live `sensorOrientationPtz` is excluded by name) and read back from the
+newest record. A system with no such outputs — DR-CAMERA — gets them created
+(`POST /systems/{id}/datastreams`) in the driver's exact shape
+(`SurveyOutputSchemas`) and then written to the same way. The system
+description is never touched: the SensorML read-modify-write built earlier
+(`SensorMLPositionPatch`, `OrderedJSON`) stays as tested code but is no longer
+wired. The review screen names the target and previews the exact bodies.
+**Height** is a chosen datum — HAE (default) or MSL, flagged when MSL goes
+into an ellipsoidal slot — plus a ±50 m mount offset.
+
+**The node has to be able to write to the system, and on the Pi it cannot
+yet.** Verified on a local osh-core 2.0.2 copy and by probes on the Pi: the
+API writes through its "Connected Systems Database" module, and a driver's
+system is in that database only when the module's System UIDs list it (or a
+wildcard). Otherwise an observation answers 400 "Resource is not writable"
+(the Pi, as admin, on the Axis `sensorLocation`), a new datastream 500, and
+the description 404. With the UID listed, the same three requests answer 201,
+201 and 204. The failure screen names the module and the setting.
+`SURVEY_IN.md` has the whole table. Fixtures `survey-in/` (Axis static-output
+schemas and observations, the live PTZ orientation schema, SensorML
+descriptions); tests `SurveyWriteStrategyTests` (detection, exact bodies,
+created outputs decode to the driver's shape), `OrderedJSONTests`,
+`SensorMLPositionPatchTests`, `SurveyMathTests`, `PTZHomePlanTests`.
+
 **PTZ cameras that move by name** (`PTZCapability.NamedMoves`). The reference
 node's second camera, DR-CAMERA, has a `ptzControl` of two `Text` items and no
 Quantity anywhere: a `preset` with five allowed names, and a `relMove` whose

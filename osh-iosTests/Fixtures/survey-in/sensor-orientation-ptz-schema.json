@@ -1,0 +1,64 @@
+{
+  "obsFormat": "application/swe+json",
+  "recordSchema": {
+    "type": "DataRecord",
+    "name": "sensorOrientationPtz",
+    "label": "Sensor Orientation",
+    "description": "Real-time orientation of the camera sensor computed from the current PTZ position. Heading and pitch are derived by applying pan and tilt offsets to the platform mount orientation. Updated each time the PTZ output polls the camera.",
+    "fields": [
+      {
+        "type": "Time",
+        "name": "time",
+        "definition": "http://www.opengis.net/def/property/OGC/0/SamplingTime",
+        "label": "Sampling Time",
+        "referenceFrame": "http://www.opengis.net/def/trs/BIPM/0/UTC",
+        "uom": {
+          "href": "http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"
+        }
+      },
+      {
+        "type": "Vector",
+        "name": "orientation",
+        "definition": "http://www.opengis.net/def/property/OGC/0/SensorOrientation",
+        "description": "Euler angles with order of rotation heading/pitch/roll in rotating frame",
+        "referenceFrame": "http://www.opengis.net/def/cs/OGC/0/NED",
+        "localFrame": "#REF_FRAME_AXIS_CAM_E82725115276",
+        "coordinates": [
+          {
+            "type": "Quantity",
+            "name": "heading",
+            "definition": "http://sensorml.com/ont/swe/property/TrueHeading",
+            "label": "Heading Angle",
+            "description": "Heading angle from true north, measured clockwise",
+            "axisID": "Z",
+            "uom": {
+              "code": "deg"
+            }
+          },
+          {
+            "type": "Quantity",
+            "name": "pitch",
+            "definition": "http://sensorml.com/ont/swe/property/PitchAngle",
+            "label": "Pitch Angle",
+            "description": "Rotation around the lateral axis, up/down from the local horizontal plane (positive when pointing up)",
+            "axisID": "Y",
+            "uom": {
+              "code": "deg"
+            }
+          },
+          {
+            "type": "Quantity",
+            "name": "roll",
+            "definition": "http://sensorml.com/ont/swe/property/RollAngle",
+            "label": "Roll Angle",
+            "description": "Rotation around the longitudinal axis",
+            "axisID": "X",
+            "uom": {
+              "code": "deg"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

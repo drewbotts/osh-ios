@@ -16,6 +16,7 @@ import CoreLocation
 //   GET /systems/{id}/datastreams             → collection of datastreams
 //   GET /datastreams/{id}                     → one datastream
 //   GET /datastreams/{id}/schema?obsFormat=…  → raw SWE schema document
+//   GET /systems/{id}?f=application/sml+json  → raw SensorML description
 
 actor ConnectedSystemsReadClient {
 
@@ -67,6 +68,26 @@ actor ConnectedSystemsReadClient {
         let url = baseURL.appendingPathComponent("systems").appendingPathComponent(id)
         let data = try await get(url: url)
         return try decode(data, from: url)
+    }
+
+    /// GET /systems/{id} as SensorML-JSON — the full description, verbatim.
+    ///
+    /// Asked for with `f=application/sml+json` *and* an Accept header. The
+    /// reference node ignores Accept alone for system resources: with only
+    /// `Accept: application/sml+json` it answers the GeoJSON feature under a
+    /// `Content-Type: auto`, and a caller that then tried to edit that document
+    /// would be putting a `position` on a Feature. The query parameter is what
+    /// the node's own alternate links use (`?f=sml3`), and it is honoured.
+    ///
+    /// Undecoded on purpose: the description is edited and sent back, and any
+    /// decode this app could do would lose content and order. See OrderedJSON.
+    func getSystemDescription(id: String) async throws -> Data {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("systems").appendingPathComponent(id),
+            resolvingAgainstBaseURL: false)
+        components?.setQueryItemsEncodingPlus([URLQueryItem(name: "f", value: Self.smlJSON)])
+        guard let url = components?.url else { throw ClientError.invalidURL("systems/\(id)?f=sml") }
+        return try await get(url: url, accept: Self.smlJSON)
     }
 
     // MARK: Datastreams
@@ -439,6 +460,7 @@ actor ConnectedSystemsReadClient {
     static let sweJSON = "application/swe+json"
     static let sweBinary = "application/swe+binary"
     static let omJSON = "application/om+json"
+    static let smlJSON = "application/sml+json"
 
     nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
